@@ -18,6 +18,8 @@ Pod::Spec.new do |s|
   s.source_files        = 'ios/**/*.{h,m}'
   s.libraries           = 'c', 'sqlite3', 'stdc++'
   s.framework           = 'AudioToolbox','AVFoundation', 'CoreAudio', 'CoreGraphics', 'CoreVideo', 'GLKit', 'VideoToolbox'
-  s.ios.vendored_frameworks = 'ios/WebRTC.framework'
-  s.xcconfig            = { 'OTHER_LDFLAGS' => '-framework WebRTC' }
+  s.dependency  'React'
+  s.dependency  'WebRTC'
+  # s.ios.vendored_frameworks = 'ios/WebRTC.framework'
+  # s.xcconfig            = { 'OTHER_LDFLAGS' => '-framework WebRTC' }
 end
