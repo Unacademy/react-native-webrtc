@@ -16,11 +16,11 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 import org.webrtc.EglBase;
+import org.webrtc.GlRectDrawer;
 import org.webrtc.MediaStream;
 import org.webrtc.RendererCommon;
 import org.webrtc.RendererCommon.RendererEvents;
 import org.webrtc.RendererCommon.ScalingType;
-import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.VideoRenderer;
 import org.webrtc.VideoTrack;
 
@@ -153,7 +153,7 @@ public class WebRTCView extends ViewGroup {
      * The {@link View} and {@link VideoRenderer#Callbacks} implementation which
      * actually renders {@link #videoTrack} on behalf of this instance.
      */
-    private final SurfaceViewRenderer surfaceViewRenderer;
+    private final UnSurfaceViewRenderer surfaceViewRenderer;
 
     /**
      * The {@code VideoRenderer}, if any, which renders {@link #videoTrack} on
@@ -169,11 +169,12 @@ public class WebRTCView extends ViewGroup {
     public WebRTCView(Context context) {
         super(context);
 
-        surfaceViewRenderer = new SurfaceViewRenderer(context);
+        surfaceViewRenderer = new UnSurfaceViewRenderer(context);
         addView(surfaceViewRenderer);
 
         setMirror(false);
         setScalingType(DEFAULT_SCALING_TYPE);
+        setBackgroundColor(Color.GREEN);
     }
 
     /**
@@ -181,9 +182,9 @@ public class WebRTCView extends ViewGroup {
      * opaque black and the surface part to transparent.
      */
     private void cleanSurfaceViewRenderer() {
-        SurfaceViewRenderer surfaceViewRenderer
+        UnSurfaceViewRenderer surfaceViewRenderer
             = getSurfaceViewRenderer();
-        surfaceViewRenderer.setBackgroundColor(Color.BLACK);
+        surfaceViewRenderer.setBackgroundColor(Color.TRANSPARENT);
         surfaceViewRenderer.clearImage();
     }
 
@@ -197,7 +198,7 @@ public class WebRTCView extends ViewGroup {
      *
      * @return The {@code SurfaceViewRenderer} which renders {@code videoTrack}.
      */
-    private SurfaceViewRenderer getSurfaceViewRenderer() {
+    private UnSurfaceViewRenderer getSurfaceViewRenderer() {
         return surfaceViewRenderer;
     }
 
@@ -469,7 +470,7 @@ public class WebRTCView extends ViewGroup {
         if (this.mirror != mirror) {
             this.mirror = mirror;
 
-            SurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
+            UnSurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
 
             surfaceViewRenderer.setMirror(mirror);
             // SurfaceViewRenderer takes the value of its mirror property into
@@ -498,7 +499,7 @@ public class WebRTCView extends ViewGroup {
     }
 
     private void setScalingType(ScalingType scalingType) {
-        SurfaceViewRenderer surfaceViewRenderer;
+        UnSurfaceViewRenderer surfaceViewRenderer;
 
         synchronized (layoutSyncRoot) {
             if (this.scalingType == scalingType) {
@@ -593,7 +594,7 @@ public class WebRTCView extends ViewGroup {
      * @param zOrder The z-order to set on this {@code WebRTCView}.
      */
     public void setZOrder(int zOrder) {
-        SurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
+        UnSurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
 
         switch (zOrder) {
         case 0:
@@ -630,8 +631,8 @@ public class WebRTCView extends ViewGroup {
                 return;
             }
 
-            SurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
-            surfaceViewRenderer.init(sharedContext, rendererEvents);
+            UnSurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
+            surfaceViewRenderer.init(sharedContext, rendererEvents,EglBase.CONFIG_RGBA, new GlDrawer());
 
             videoRenderer = new VideoRenderer(surfaceViewRenderer);
             videoTrack.addRenderer(videoRenderer);
