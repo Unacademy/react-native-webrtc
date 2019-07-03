@@ -29,7 +29,7 @@ import org.webrtc.VideoRenderer.Callbacks;
 import org.webrtc.VideoRenderer.I420Frame;
 import org.webrtc.VideoSink;
 
-public class UnSurfaceViewRenderer extends GLSurfaceView implements Callback, Callbacks, VideoSink {
+public class UnSurfaceViewRenderer extends GLSurfaceView implements Callback, Callbacks, VideoSink, ViewRenderInterface {
     private static final String TAG = "SurfaceViewRenderer";
     private final String resourceName = this.getResourceName();
     private final VideoLayoutMeasure videoLayoutMeasure = new VideoLayoutMeasure();

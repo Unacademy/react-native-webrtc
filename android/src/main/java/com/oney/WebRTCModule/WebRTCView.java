@@ -101,6 +101,8 @@ public class WebRTCView extends ViewGroup {
      */
     private boolean mirror;
 
+    private String tempStreamUrl;
+
     /**
      * The {@code RendererEvents} which listens to rendering events reported by
      * {@link #surfaceViewRenderer}.
@@ -153,7 +155,7 @@ public class WebRTCView extends ViewGroup {
      * The {@link View} and {@link VideoRenderer#Callbacks} implementation which
      * actually renders {@link #videoTrack} on behalf of this instance.
      */
-    private final UnSurfaceViewRenderer surfaceViewRenderer;
+    private ViewRenderInterface surfaceViewRenderer;
 
     /**
      * The {@code VideoRenderer}, if any, which renders {@link #videoTrack} on
@@ -166,15 +168,29 @@ public class WebRTCView extends ViewGroup {
      */
     private VideoTrack videoTrack;
 
+    private boolean useGreenScreen;
+    private NormalSurfaceViewRender normalSurfaceViewRender;
+    private UnSurfaceViewRenderer unSurfaceViewRenderer;
+
     public WebRTCView(Context context) {
         super(context);
+    }
 
-        surfaceViewRenderer = new UnSurfaceViewRenderer(context);
-        addView(surfaceViewRenderer);
-
+    public void setUseGreenScreen(boolean useGreenScreen) {
+        this.useGreenScreen = useGreenScreen;
+        View view = useGreenScreen ? new UnSurfaceViewRenderer(getContext()): new NormalSurfaceViewRender(getContext());
+        normalSurfaceViewRender = !useGreenScreen ? (NormalSurfaceViewRender) view : null;
+        unSurfaceViewRenderer = useGreenScreen ? (UnSurfaceViewRenderer) view : null;
+        surfaceViewRenderer = (ViewRenderInterface) view;
+        addView(view);
         setMirror(false);
         setScalingType(DEFAULT_SCALING_TYPE);
-        setBackgroundColor(Color.GREEN);
+        if (useGreenScreen) {
+            setBackgroundColor(Color.TRANSPARENT);
+        }
+        if (tempStreamUrl != null) {
+            setStreamURL(tempStreamUrl);
+        }
     }
 
     /**
@@ -182,9 +198,13 @@ public class WebRTCView extends ViewGroup {
      * opaque black and the surface part to transparent.
      */
     private void cleanSurfaceViewRenderer() {
-        UnSurfaceViewRenderer surfaceViewRenderer
+        ViewRenderInterface surfaceViewRenderer
             = getSurfaceViewRenderer();
-        surfaceViewRenderer.setBackgroundColor(Color.TRANSPARENT);
+        if (this.useGreenScreen) {
+            surfaceViewRenderer.setBackgroundColor(Color.TRANSPARENT);
+        } else {
+            surfaceViewRenderer.setBackgroundColor(Color.BLACK);
+        }
         surfaceViewRenderer.clearImage();
     }
 
@@ -198,7 +218,7 @@ public class WebRTCView extends ViewGroup {
      *
      * @return The {@code SurfaceViewRenderer} which renders {@code videoTrack}.
      */
-    private UnSurfaceViewRenderer getSurfaceViewRenderer() {
+    private ViewRenderInterface getSurfaceViewRenderer() {
         return surfaceViewRenderer;
     }
 
@@ -470,7 +490,7 @@ public class WebRTCView extends ViewGroup {
         if (this.mirror != mirror) {
             this.mirror = mirror;
 
-            UnSurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
+            ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
 
             surfaceViewRenderer.setMirror(mirror);
             // SurfaceViewRenderer takes the value of its mirror property into
@@ -499,7 +519,7 @@ public class WebRTCView extends ViewGroup {
     }
 
     private void setScalingType(ScalingType scalingType) {
-        UnSurfaceViewRenderer surfaceViewRenderer;
+        ViewRenderInterface surfaceViewRenderer;
 
         synchronized (layoutSyncRoot) {
             if (this.scalingType == scalingType) {
@@ -526,6 +546,10 @@ public class WebRTCView extends ViewGroup {
      */
     void setStreamURL(String streamURL) {
         // Is the value of this.streamURL really changing?
+        if (surfaceViewRenderer == null) {
+            tempStreamUrl = streamURL;
+            return;
+        }
         if (streamURL == null
                 ? this.streamURL != null
                 : !streamURL.equals(this.streamURL)) {
@@ -594,7 +618,7 @@ public class WebRTCView extends ViewGroup {
      * @param zOrder The z-order to set on this {@code WebRTCView}.
      */
     public void setZOrder(int zOrder) {
-        UnSurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
+        ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
 
         switch (zOrder) {
         case 0:
@@ -631,8 +655,12 @@ public class WebRTCView extends ViewGroup {
                 return;
             }
 
-            UnSurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
-            surfaceViewRenderer.init(sharedContext, rendererEvents,EglBase.CONFIG_RGBA, new GlDrawer());
+            ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
+            if (useGreenScreen) {
+                surfaceViewRenderer.init(sharedContext, rendererEvents,EglBase.CONFIG_RGBA, new GlDrawer());
+            } else {
+                surfaceViewRenderer.init(sharedContext, rendererEvents);
+            }
 
             videoRenderer = new VideoRenderer(surfaceViewRenderer);
             videoTrack.addRenderer(videoRenderer);
