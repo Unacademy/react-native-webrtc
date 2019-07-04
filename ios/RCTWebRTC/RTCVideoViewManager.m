@@ -15,6 +15,8 @@
 
 #import "RTCVideoViewManager.h"
 #import "WebRTCModule.h"
+#import "RTCUNShader.h"
+#import <GLKit/GLKit.h>
 
 /**
  * In the fashion of
@@ -51,6 +53,12 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
  * applications choose to mirror the front/user-facing camera.
  */
 @property (nonatomic) BOOL mirror;
+
+/**
+ * The indicator which determines whether this {@code RTCVideoView} is to remove
+ * green color during rendering.
+ */
+@property (nonatomic) BOOL useGreenScreen;
 
 /**
  * In the fashion of
@@ -130,18 +138,52 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
  */
 - (instancetype)initWithFrame:(CGRect)frame {
   if (self = [super initWithFrame:frame]) {
-    RTCEAGLVideoView *subview = [[RTCEAGLVideoView alloc] init];
-
-    subview.delegate = self;
-
-    _videoSize.height = 0;
-    _videoSize.width = 0;
-
-    self.opaque = NO;
-    [self addSubview:subview];
+//    RTCEAGLVideoView *subview;
+//    if (_useGreenScreen) {
+//        subview = [[RTCEAGLVideoView alloc] initWithFrame:frame shader:[[RTCUNShader alloc] init]];
+//    } else {
+//        subview = [[RTCEAGLVideoView alloc] initWithFrame:frame shader:[[RTCUNShader alloc] init]];
+//    }
+////    RTCEAGLVideoView *subview = [[RTCEAGLVideoView alloc] initWithFrame:frame shader:[[RTCUNShader alloc] init]];
+//
+//    subview.delegate = self;
+////    CAEAGLLayer *eaglLayer = (CAEAGLLayer *)self.layer;
+////    eaglLayer.opaque = NO;
+////    self.backgroundColor = [UIColor clearColor];
+//    GLKView *glkView = subview.subviews[0];
+//    glkView.backgroundColor = [UIColor clearColor];
+//    _videoSize.height = 0;
+//    _videoSize.width = 0;
+//
+//    self.opaque = NO;
+//    [self addSubview:subview];
   }
   return self;
 }
+
+- (void)configureSubviews {
+    RTCEAGLVideoView *subview;
+    if (_useGreenScreen) {
+        subview = [[RTCEAGLVideoView alloc] initWithFrame:self.frame shader:[[RTCUNShader alloc] init]];
+    } else {
+        subview = [[RTCEAGLVideoView alloc] initWithFrame:self.frame];
+    }
+    
+    subview.delegate = self;
+    
+    if (subview && [subview.subviews count] > 0) {
+        GLKView *glkView = subview.subviews[0];
+        if (glkView) {
+            glkView.backgroundColor = [UIColor clearColor];
+        }
+    }
+    
+    _videoSize.height = 0;
+    _videoSize.width = 0;
+    
+    self.opaque = NO;
+    [self addSubview:subview];
+ }
 
 /**
  * Lays out the subview of this instance while preserving the aspect ratio of
@@ -221,6 +263,13 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
       _mirror = mirror;
       [self dispatchAsyncSetNeedsLayout];
   }
+}
+
+- (void)setUseGreenScreen:(BOOL)useGreenScreen {
+    if (_useGreenScreen != useGreenScreen) {
+        _useGreenScreen = useGreenScreen;
+        [self configureSubviews];
+    }
 }
 
 /**
@@ -351,6 +400,8 @@ RCT_EXPORT_MODULE()
 }
 
 RCT_EXPORT_VIEW_PROPERTY(mirror, BOOL)
+
+RCT_EXPORT_VIEW_PROPERTY(useGreenScreen, BOOL)
 
 /**
  * In the fashion of
