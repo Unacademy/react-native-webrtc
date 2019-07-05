@@ -73,4 +73,9 @@ public class RTCVideoViewManager extends SimpleViewManager<WebRTCView> {
   public void setZOrder(WebRTCView view, int zOrder) {
     view.setZOrder(zOrder);
   }
+
+  @ReactProp(name = "useGreenScreen", defaultBoolean = false)
+  public void setUseGreenScreen(WebRTCView view, boolean value) {
+    view.setUseGreenScreen(value);
+  }
 }
