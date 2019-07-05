@@ -13,4 +13,9 @@ public class NormalSurfaceViewRender extends SurfaceViewRenderer implements View
     public NormalSurfaceViewRender(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
+
+    @Override
+    public void setGreenScreenFlags() {
+
+    }
 }

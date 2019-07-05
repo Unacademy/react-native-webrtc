@@ -169,27 +169,22 @@ public class WebRTCView extends ViewGroup {
     private VideoTrack videoTrack;
 
     private boolean useGreenScreen;
-    private NormalSurfaceViewRender normalSurfaceViewRender;
     private UnSurfaceViewRenderer unSurfaceViewRenderer;
 
     public WebRTCView(Context context) {
         super(context);
+        unSurfaceViewRenderer = new UnSurfaceViewRenderer(getContext());
+        surfaceViewRenderer = (ViewRenderInterface) unSurfaceViewRenderer;
+        addView(unSurfaceViewRenderer);
+        setMirror(false);
+        setScalingType(DEFAULT_SCALING_TYPE);
     }
 
     public void setUseGreenScreen(boolean useGreenScreen) {
         this.useGreenScreen = useGreenScreen;
-        View view = useGreenScreen ? new UnSurfaceViewRenderer(getContext()): new NormalSurfaceViewRender(getContext());
-        normalSurfaceViewRender = !useGreenScreen ? (NormalSurfaceViewRender) view : null;
-        unSurfaceViewRenderer = useGreenScreen ? (UnSurfaceViewRenderer) view : null;
-        surfaceViewRenderer = (ViewRenderInterface) view;
-        addView(view);
-        setMirror(false);
-        setScalingType(DEFAULT_SCALING_TYPE);
         if (useGreenScreen) {
             setBackgroundColor(Color.TRANSPARENT);
-        }
-        if (tempStreamUrl != null) {
-            setStreamURL(tempStreamUrl);
+            unSurfaceViewRenderer.setGreenScreenFlags();
         }
     }
 
