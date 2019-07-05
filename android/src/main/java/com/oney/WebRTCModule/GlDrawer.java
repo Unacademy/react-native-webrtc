@@ -56,9 +56,30 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     + "  float y = texture2D(y_tex, interp_tc).r;\n"
                     + "  float u = texture2D(u_tex, interp_tc).r - 0.5;\n"
                     + "  float v = texture2D(v_tex, interp_tc).r - 0.5;\n"
-                    + "  gl_FragColor = vec4(y + 1.403 * v, "
+                    + "  vec4 sourcePixel = vec4(y + 1.403 * v, "
                     + "                      y - 0.344 * u - 0.714 * v, "
                     + "                      y + 1.77 * u, 1);\n"
+                    +"  float pixelSat, secondaryComponents;\n"
+                    +"  float fmin = min(min(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
+                    +"  float fmax = max(max(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
+                    +"  vec4 screen = vec4(0.0,1.0,0.0,1.0);\n"
+                    +"	float fmax1 = max(max(screen.r, screen.g), screen.b);\n"
+                    +"  vec3 screenPrimary = step(fmax1, screen.rgb);\n"
+                    +"  vec3 pixelPrimary = step(fmax, sourcePixel.rgb);\n"
+                    +"  secondaryComponents = dot(1.0 - pixelPrimary, sourcePixel.rgb);\n"
+                    +"  float screenSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
+                    +"  pixelSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
+                    +"  float diffPrimary = dot(abs(pixelPrimary - screenPrimary), vec3(1.0));\n"
+                    +"  float solid = step(1.0, step(pixelSat, 0.1) + step(fmax, 0.1) + diffPrimary);\n"
+                    +"  float alpha = max(0.0, 1.0 - pixelSat / screenSat);\n"
+                    +"  alpha = smoothstep(0.0, 1.0, alpha);\n"
+                    +"  vec4 semiTransparentPixel = vec4((sourcePixel.rgb - (1.0 - alpha) * screen.rgb * 1.0) / max(0.00001, alpha), alpha);\n"
+                    +"  vec4 pixel = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, solid);\n"
+                    +"   gl_FragColor = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b,1.0);\n"
+                    +"if(solid == 0.0)\n"
+                    +"{\n"
+                    +"gl_FragColor=vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, 0.0);\n"
+                    +"}\n"
                     + "}\n";
 
     private static final String RGB_FRAGMENT_SHADER_STRING =
@@ -68,7 +89,28 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     + "uniform sampler2D rgb_tex;\n"
                     + "\n"
                     + "void main() {\n"
-                    + "  gl_FragColor = texture2D(rgb_tex, interp_tc);\n"
+                    +"  float pixelSat, secondaryComponents;\n"
+                    +"  vec4 sourcePixel = texture2D(rgb_tex, interp_tc);\n"
+                    +"  float fmin = min(min(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
+                    +"  float fmax = max(max(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
+                    +"  vec4 screen = vec4(0.0,1.0,0.0,1.0);\n"
+                    +"	float fmax1 = max(max(screen.r, screen.g), screen.b);\n"
+                    +"  vec3 screenPrimary = step(fmax1, screen.rgb);\n"
+                    +"  vec3 pixelPrimary = step(fmax, sourcePixel.rgb);\n"
+                    +"  secondaryComponents = dot(1.0 - pixelPrimary, sourcePixel.rgb);\n"
+                    +"  float screenSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
+                    +"  pixelSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
+                    +"  float diffPrimary = dot(abs(pixelPrimary - screenPrimary), vec3(1.0));\n"
+                    +"  float solid = step(1.0, step(pixelSat, 0.1) + step(fmax, 0.1) + diffPrimary);\n"
+                    +"  float alpha = max(0.0, 1.0 - pixelSat / screenSat);\n"
+                    +"  alpha = smoothstep(0.0, 1.0, alpha);\n"
+                    +"  vec4 semiTransparentPixel = vec4((sourcePixel.rgb - (1.0 - alpha) * screen.rgb * 1.0) / max(0.00001, alpha), alpha);\n"
+                    +"  vec4 pixel = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, solid);\n"
+                    +"   gl_FragColor = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b,1.0);\n"
+                    +"if(solid == 0.0)\n"
+                    +"{\n"
+                    +"gl_FragColor=vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, 0.0);\n"
+                    +"}\n"
                     + "}\n";
 
     private static final String OES_FRAGMENT_SHADER_STRING =
@@ -184,6 +226,12 @@ public class GlDrawer implements RendererCommon.GlDrawer {
     public void drawRgb(int textureId, float[] texMatrix, int frameWidth, int frameHeight,
                         int viewportX, int viewportY, int viewportWidth, int viewportHeight) {
         prepareShader(RGB_FRAGMENT_SHADER_STRING, texMatrix);
+
+        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId);
         drawRectangle(viewportX, viewportY, viewportWidth, viewportHeight);
@@ -199,6 +247,11 @@ public class GlDrawer implements RendererCommon.GlDrawer {
     public void drawYuv(int[] yuvTextures, float[] texMatrix, int frameWidth, int frameHeight,
                         int viewportX, int viewportY, int viewportWidth, int viewportHeight) {
         prepareShader(YUV_FRAGMENT_SHADER_STRING, texMatrix);
+
+        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
         // Bind the textures.
         for (int i = 0; i < 3; ++i) {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + i);
