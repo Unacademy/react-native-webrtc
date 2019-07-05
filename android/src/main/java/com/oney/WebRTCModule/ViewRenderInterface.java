@@ -17,4 +17,5 @@ public interface ViewRenderInterface extends VideoRenderer.Callbacks {
     public void layout(int l, int t, int r, int b);
     public void release();
     public void requestLayout();
+    public void setGreenScreenFlags();
 }

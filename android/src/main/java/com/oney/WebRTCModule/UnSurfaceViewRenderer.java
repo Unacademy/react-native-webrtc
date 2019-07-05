@@ -29,7 +29,7 @@ import org.webrtc.VideoRenderer.Callbacks;
 import org.webrtc.VideoRenderer.I420Frame;
 import org.webrtc.VideoSink;
 
-public class UnSurfaceViewRenderer extends GLSurfaceView implements Callback, Callbacks, VideoSink, ViewRenderInterface {
+public class UnSurfaceViewRenderer extends SurfaceView implements Callback, Callbacks, VideoSink, ViewRenderInterface {
     private static final String TAG = "SurfaceViewRenderer";
     private final String resourceName = this.getResourceName();
     private final VideoLayoutMeasure videoLayoutMeasure = new VideoLayoutMeasure();
@@ -58,11 +58,8 @@ public class UnSurfaceViewRenderer extends GLSurfaceView implements Callback, Ca
 
         ///setEGLConfigChooser(8, 8, 8, 8, 16, 0);
        //
-        this.setZOrderOnTop(true);
-      //  getHolder().setFormat(PixelFormat.RGB_565);
-        setEGLContextClientVersion(2);
-        this.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
-        this.getHolder().setFormat(PixelFormat.RGBA_8888);
+//        this.setZOrderOnTop(true);
+//        this.getHolder().setFormat(PixelFormat.TRANSLUCENT);
 
        // setPreserveEGLContextOnPause(true);
         //setOpaque(false);
@@ -70,16 +67,19 @@ public class UnSurfaceViewRenderer extends GLSurfaceView implements Callback, Ca
 
     }
 
+    public void setGreenScreenFlags() {
+        this.setZOrderOnTop(true);
+        this.getHolder().setFormat(PixelFormat.TRANSLUCENT);
+    }
+
     public UnSurfaceViewRenderer(Context context, AttributeSet attrs) {
         super(context, attrs);
         this.eglRenderer = new EglRenderer(this.resourceName);
         this.getHolder().addCallback(this);
-        this.setZOrderOnTop(true);
-       // getHolder().setFormat(PixelFormat.RGB_565);
-        setEGLContextClientVersion(2);
+//        this.setZOrderOnTop(true);
+//        this.getHolder().setFormat(PixelFormat.TRANSLUCENT);
+        // getHolder().setFormat(PixelFormat.RGB_565);
 
-        this.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
-        this.getHolder().setFormat(PixelFormat.RGBA_8888);
         //this.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 
     }
