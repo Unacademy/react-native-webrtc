@@ -16,15 +16,15 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 import org.webrtc.EglBase;
+import org.webrtc.GlRectDrawer;
 import org.webrtc.MediaStream;
 import org.webrtc.RendererCommon;
 import org.webrtc.RendererCommon.RendererEvents;
 import org.webrtc.RendererCommon.ScalingType;
-import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.VideoRenderer;
 import org.webrtc.VideoTrack;
 
-public class WebRTCView extends ViewGroup {
+public class WebRTCGreenScreenView extends ViewGroup {
     /**
      * The scaling type to be utilized by default.
      *
@@ -41,7 +41,7 @@ public class WebRTCView extends ViewGroup {
      * video represent nothing.
      */
     private static final ScalingType DEFAULT_SCALING_TYPE
-            = ScalingType.SCALE_ASPECT_FIT;
+        = ScalingType.SCALE_ASPECT_FIT;
 
     /**
      * {@link View#isInLayout()} as a <tt>Method</tt> to be invoked via
@@ -59,7 +59,7 @@ public class WebRTCView extends ViewGroup {
         Method isInLayout = null;
 
         try {
-            Method m = WebRTCView.class.getMethod("isInLayout");
+            Method m = WebRTCGreenScreenView.class.getMethod("isInLayout");
 
             if (boolean.class.isAssignableFrom(m.getReturnType())) {
                 isInLayout = m;
@@ -96,31 +96,33 @@ public class WebRTCView extends ViewGroup {
     private final Object layoutSyncRoot = new Object();
 
     /**
-     * The indicator which determines whether this {@code WebRTCView} is to
+     * The indicator which determines whether this {@code WebRTCGreenScreenView} is to
      * mirror the video represented by {@link #videoTrack} during its rendering.
      */
     private boolean mirror;
+
+    private String tempStreamUrl;
 
     /**
      * The {@code RendererEvents} which listens to rendering events reported by
      * {@link #surfaceViewRenderer}.
      */
     private final RendererEvents rendererEvents
-            = new RendererEvents() {
-        @Override
-        public void onFirstFrameRendered() {
-            WebRTCView.this.onFirstFrameRendered();
-        }
+        = new RendererEvents() {
+            @Override
+            public void onFirstFrameRendered() {
+                WebRTCGreenScreenView.this.onFirstFrameRendered();
+            }
 
-        @Override
-        public void onFrameResolutionChanged(
-                int videoWidth, int videoHeight,
-                int rotation) {
-            WebRTCView.this.onFrameResolutionChanged(
-                    videoWidth, videoHeight,
-                    rotation);
-        }
-    };
+            @Override
+            public void onFrameResolutionChanged(
+                    int videoWidth, int videoHeight,
+                    int rotation) {
+                WebRTCGreenScreenView.this.onFrameResolutionChanged(
+                        videoWidth, videoHeight,
+                        rotation);
+            }
+        };
 
     /**
      * The {@code Runnable} representation of
@@ -129,15 +131,15 @@ public class WebRTCView extends ViewGroup {
      * initializing new instances on every (method) call.
      */
     private final Runnable requestSurfaceViewRendererLayoutRunnable
-            = new Runnable() {
-        @Override
-        public void run() {
-            requestSurfaceViewRendererLayout();
-        }
-    };
+        = new Runnable() {
+            @Override
+            public void run() {
+                requestSurfaceViewRendererLayout();
+            }
+        };
 
     /**
-     * The scaling type this {@code WebRTCView} is to apply to the video
+     * The scaling type this {@code WebRTCGreenScreenView} is to apply to the video
      * represented by {@link #videoTrack} during its rendering. An expression of
      * the CSS property {@code object-fit} in the terms of WebRTC.
      */
@@ -145,7 +147,7 @@ public class WebRTCView extends ViewGroup {
 
     /**
      * The URL, if any, of the {@link MediaStream} (to be) rendered by this
-     * {@code WebRTCView}. The value of {@link #videoTrack} is derived from it.
+     * {@code WebRTCGreenScreenView}. The value of {@link #videoTrack} is derived from it.
      */
     private String streamURL;
 
@@ -153,7 +155,7 @@ public class WebRTCView extends ViewGroup {
      * The {@link View} and {@link VideoRenderer#Callbacks} implementation which
      * actually renders {@link #videoTrack} on behalf of this instance.
      */
-    private final SurfaceViewRenderer surfaceViewRenderer;
+    private ViewRenderInterface surfaceViewRenderer;
 
     /**
      * The {@code VideoRenderer}, if any, which renders {@link #videoTrack} on
@@ -162,28 +164,44 @@ public class WebRTCView extends ViewGroup {
     private VideoRenderer videoRenderer;
 
     /**
-     * The {@code VideoTrack}, if any, rendered by this {@code WebRTCView}.
+     * The {@code VideoTrack}, if any, rendered by this {@code WebRTCGreenScreenView}.
      */
     private VideoTrack videoTrack;
 
-    public WebRTCView(Context context) {
+    private UnSurfaceViewRenderer unSurfaceViewRenderer;
+
+    public WebRTCGreenScreenView(Context context) {
         super(context);
-
-        surfaceViewRenderer = new SurfaceViewRenderer(context);
-        addView(surfaceViewRenderer);
-
-        setMirror(false);
+        unSurfaceViewRenderer = new UnSurfaceViewRenderer(getContext());
+        surfaceViewRenderer = (ViewRenderInterface) unSurfaceViewRenderer;
+        addView(unSurfaceViewRenderer);
+        setMirror(true);
         setScalingType(DEFAULT_SCALING_TYPE);
+        setBackgroundColor(Color.TRANSPARENT);
+        unSurfaceViewRenderer.setGreenScreenFlags();
     }
+
+//    public void setUseGreenScreen(boolean useGreenScreen) {
+//        this.useGreenScreen = useGreenScreen;
+//        if (useGreenScreen) {
+//            setBackgroundColor(Color.TRANSPARENT);
+//            unSurfaceViewRenderer.setGreenScreenFlags();
+//        }
+//    }
 
     /**
      * "Cleans" the {@code SurfaceViewRenderer} by setting the view part to
      * opaque black and the surface part to transparent.
      */
     private void cleanSurfaceViewRenderer() {
-        SurfaceViewRenderer surfaceViewRenderer
-                = getSurfaceViewRenderer();
-        surfaceViewRenderer.setBackgroundColor(Color.BLACK);
+        ViewRenderInterface surfaceViewRenderer
+            = getSurfaceViewRenderer();
+        surfaceViewRenderer.setBackgroundColor(Color.TRANSPARENT);
+//        if (this.useGreenScreen) {
+//            surfaceViewRenderer.setBackgroundColor(Color.TRANSPARENT);
+//        } else {
+//            surfaceViewRenderer.setBackgroundColor(Color.BLACK);
+//        }
         surfaceViewRenderer.clearImage();
     }
 
@@ -192,21 +210,21 @@ public class WebRTCView extends ViewGroup {
      * Explicitly defined and used in order to facilitate switching the instance
      * at compile time. For example, reduces the number of modifications
      * necessary to switch the implementation from a {@code SurfaceViewRenderer}
-     * that is a child of a {@code WebRTCView} to {@code WebRTCView} extending
+     * that is a child of a {@code WebRTCGreenScreenView} to {@code WebRTCGreenScreenView} extending
      * {@code SurfaceViewRenderer}.
      *
      * @return The {@code SurfaceViewRenderer} which renders {@code videoTrack}.
      */
-    private SurfaceViewRenderer getSurfaceViewRenderer() {
+    private ViewRenderInterface getSurfaceViewRenderer() {
         return surfaceViewRenderer;
     }
 
     /**
      * Gets the {@link VideoTrack}, if any, (to be) rendered by this
-     * {@code WebRTCView}.
+     * {@code WebRTCGreenScreenView}.
      *
      * @return The {@code VideoTrack} (to be) rendered by this
-     * {@code WebRTCView}.
+     * {@code WebRTCGreenScreenView}.
      */
     private VideoTrack getVideoTrack() {
         VideoTrack videoTrack = this.videoTrack;
@@ -228,7 +246,7 @@ public class WebRTCView extends ViewGroup {
         if (streamURL != null) {
             ReactContext reactContext = (ReactContext) getContext();
             WebRTCModule module
-                    = reactContext.getNativeModule(WebRTCModule.class);
+                = reactContext.getNativeModule(WebRTCModule.class);
             MediaStream stream = module.getStreamForReactTag(streamURL);
 
             if (stream != null) {
@@ -364,41 +382,41 @@ public class WebRTCView extends ViewGroup {
             }
 
             switch (scalingType) {
-                case SCALE_ASPECT_FILL:
-                    // Fill this ViewGroup with surfaceViewRenderer and the latter
-                    // will take care of filling itself with the video similarly to
-                    // the cover value the CSS property object-fit.
-                    r = width;
-                    l = 0;
-                    b = height;
-                    t = 0;
-                    break;
-                case SCALE_ASPECT_FIT:
-                default:
-                    // Lay surfaceViewRenderer out inside this ViewGroup in accord
-                    // with the contain value of the CSS property object-fit.
-                    // SurfaceViewRenderer will fill itself with the video similarly
-                    // to the cover or contain value of the CSS property object-fit
-                    // (which will not matter, eventually).
-                    if (frameHeight == 0 || frameWidth == 0) {
-                        l = t = r = b = 0;
-                    } else {
-                        float frameAspectRatio
-                                = (frameRotation % 180 == 0)
-                                ? frameWidth / (float) frameHeight
-                                : frameHeight / (float) frameWidth;
-                        Point frameDisplaySize
-                                = RendererCommon.getDisplaySize(
+            case SCALE_ASPECT_FILL:
+                // Fill this ViewGroup with surfaceViewRenderer and the latter
+                // will take care of filling itself with the video similarly to
+                // the cover value the CSS property object-fit.
+                r = width;
+                l = 0;
+                b = height;
+                t = 0;
+                break;
+            case SCALE_ASPECT_FIT:
+            default:
+                // Lay surfaceViewRenderer out inside this ViewGroup in accord
+                // with the contain value of the CSS property object-fit.
+                // SurfaceViewRenderer will fill itself with the video similarly
+                // to the cover or contain value of the CSS property object-fit
+                // (which will not matter, eventually).
+                if (frameHeight == 0 || frameWidth == 0) {
+                    l = t = r = b = 0;
+                } else {
+                    float frameAspectRatio
+                        = (frameRotation % 180 == 0)
+                            ? frameWidth / (float) frameHeight
+                            : frameHeight / (float) frameWidth;
+                    Point frameDisplaySize
+                        = RendererCommon.getDisplaySize(
                                 scalingType,
                                 frameAspectRatio,
                                 width, height);
 
-                        l = (width - frameDisplaySize.x) / 2;
-                        t = (height - frameDisplaySize.y) / 2;
-                        r = l + frameDisplaySize.x;
-                        b = t + frameDisplaySize.y;
-                    }
-                    break;
+                    l = (width - frameDisplaySize.x) / 2;
+                    t = (height - frameDisplaySize.y) / 2;
+                    r = l + frameDisplaySize.x;
+                    b = t + frameDisplaySize.y;
+                }
+                break;
             }
         }
         getSurfaceViewRenderer().layout(l, t, r, b);
@@ -410,6 +428,8 @@ public class WebRTCView extends ViewGroup {
      */
     private void removeRendererFromVideoTrack() {
         if (videoRenderer != null) {
+
+
             // XXX If WebRTCModule#mediaStreamTrackRelease has already been
             // invoked on videoTrack, then it is no longer safe to call methods
             // (e.g. addRenderer, removeRenderer) on videoTrack. It is OK to
@@ -427,7 +447,7 @@ public class WebRTCView extends ViewGroup {
 
             getSurfaceViewRenderer().release();
 
-            // Since this WebRTCView is no longer rendering anything, make sure
+            // Since this WebRTCGreenScreenView is no longer rendering anything, make sure
             // surfaceViewRenderer displays nothing as well.
             synchronized (layoutSyncRoot) {
                 frameHeight = 0;
@@ -452,16 +472,16 @@ public class WebRTCView extends ViewGroup {
         // rotation change. The following will suffice.
         if (!invokeIsInLayout()) {
             onLayout(
-                    /* changed */ false,
-                    getLeft(), getTop(), getRight(), getBottom());
+                /* changed */ false,
+                getLeft(), getTop(), getRight(), getBottom());
         }
     }
 
     /**
-     * Sets the indicator which determines whether this {@code WebRTCView} is to
+     * Sets the indicator which determines whether this {@code WebRTCGreenScreenView} is to
      * mirror the video represented by {@link #videoTrack} during its rendering.
      *
-     * @param mirror If this {@code WebRTCView} is to mirror the video
+     * @param mirror If this {@code WebRTCGreenScreenView} is to mirror the video
      * represented by {@code videoTrack} during its rendering, {@code true};
      * otherwise, {@code false}.
      */
@@ -469,7 +489,7 @@ public class WebRTCView extends ViewGroup {
         if (this.mirror != mirror) {
             this.mirror = mirror;
 
-            SurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
+            ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
 
             surfaceViewRenderer.setMirror(mirror);
             // SurfaceViewRenderer takes the value of its mirror property into
@@ -486,11 +506,11 @@ public class WebRTCView extends ViewGroup {
      *
      * @param objectFit For details, refer to the documentation of the
      * {@code objectFit} property of the JavaScript counterpart of
-     * {@code WebRTCView} i.e. {@code RTCView}.
+     * {@code WebRTCGreenScreenView} i.e. {@code RTCView}.
      */
     public void setObjectFit(String objectFit) {
         ScalingType scalingType
-                = "cover".equals(objectFit)
+            = "cover".equals(objectFit)
                 ? ScalingType.SCALE_ASPECT_FILL
                 : ScalingType.SCALE_ASPECT_FIT;
 
@@ -498,7 +518,7 @@ public class WebRTCView extends ViewGroup {
     }
 
     private void setScalingType(ScalingType scalingType) {
-        SurfaceViewRenderer surfaceViewRenderer;
+        ViewRenderInterface surfaceViewRenderer;
 
         synchronized (layoutSyncRoot) {
             if (this.scalingType == scalingType) {
@@ -516,15 +536,19 @@ public class WebRTCView extends ViewGroup {
     }
 
     /**
-     * Sets the {@code MediaStream} to be rendered by this {@code WebRTCView}.
+     * Sets the {@code MediaStream} to be rendered by this {@code WebRTCGreenScreenView}.
      * The implementation renders the first {@link VideoTrack}, if any, of the
      * specified {@code mediaStream}.
      *
      * @param streamURL The URL of the {@code MediaStream} to be rendered by
-     * this {@code WebRTCView} or {@code null}.
+     * this {@code WebRTCGreenScreenView} or {@code null}.
      */
     void setStreamURL(String streamURL) {
         // Is the value of this.streamURL really changing?
+        if (surfaceViewRenderer == null) {
+            tempStreamUrl = streamURL;
+            return;
+        }
         if (streamURL == null
                 ? this.streamURL != null
                 : !streamURL.equals(this.streamURL)) {
@@ -553,10 +577,10 @@ public class WebRTCView extends ViewGroup {
     }
 
     /**
-     * Sets the {@code VideoTrack} to be rendered by this {@code WebRTCView}.
+     * Sets the {@code VideoTrack} to be rendered by this {@code WebRTCGreenScreenView}.
      *
      * @param videoTrack The {@code VideoTrack} to be rendered by this
-     * {@code WebRTCView} or {@code null}.
+     * {@code WebRTCGreenScreenView} or {@code null}.
      */
     private void setVideoTrack(VideoTrack videoTrack) {
         VideoTrack oldVideoTrack = this.videoTrack;
@@ -585,26 +609,26 @@ public class WebRTCView extends ViewGroup {
     }
 
     /**
-     * Sets the z-order of this {@link WebRTCView} in the stacking space of all
-     * {@code WebRTCView}s. For more details, refer to the documentation of the
+     * Sets the z-order of this {@link WebRTCGreenScreenView} in the stacking space of all
+     * {@code WebRTCGreenScreenView}s. For more details, refer to the documentation of the
      * {@code zOrder} property of the JavaScript counterpart of
-     * {@code WebRTCView} i.e. {@code RTCView}.
+     * {@code WebRTCGreenScreenView} i.e. {@code RTCView}.
      *
-     * @param zOrder The z-order to set on this {@code WebRTCView}.
+     * @param zOrder The z-order to set on this {@code WebRTCGreenScreenView}.
      */
     public void setZOrder(int zOrder) {
-        SurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
+        ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
 
         switch (zOrder) {
-            case 0:
-                surfaceViewRenderer.setZOrderMediaOverlay(false);
-                break;
-            case 1:
-                surfaceViewRenderer.setZOrderMediaOverlay(true);
-                break;
-            case 2:
-                surfaceViewRenderer.setZOrderOnTop(true);
-                break;
+        case 0:
+            surfaceViewRenderer.setZOrderMediaOverlay(false);
+            break;
+        case 1:
+            surfaceViewRenderer.setZOrderMediaOverlay(true);
+            break;
+        case 2:
+            surfaceViewRenderer.setZOrderOnTop(true);
+            break;
         }
     }
 
@@ -630,11 +654,17 @@ public class WebRTCView extends ViewGroup {
                 return;
             }
 
-            SurfaceViewRenderer surfaceViewRenderer = getSurfaceViewRenderer();
-            surfaceViewRenderer.init(sharedContext, rendererEvents);
+            ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
+            surfaceViewRenderer.init(sharedContext, rendererEvents, EglBase.CONFIG_RGBA, new GlDrawer());
+//            if (useGreenScreen) {
+//                surfaceViewRenderer.init(sharedContext, rendererEvents,EglBase.CONFIG_RGBA, new GlDrawer());
+//            } else {
+//                surfaceViewRenderer.init(sharedContext, rendererEvents);
+//            }
 
             videoRenderer = new VideoRenderer(surfaceViewRenderer);
             videoTrack.addRenderer(videoRenderer);
         }
     }
 }
+
