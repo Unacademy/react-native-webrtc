@@ -655,16 +655,39 @@ public class WebRTCGreenScreenView extends ViewGroup {
             }
 
             ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
-            surfaceViewRenderer.init(sharedContext, rendererEvents, EglBase.CONFIG_RGBA, new GlDrawer());
-//            if (useGreenScreen) {
-//                surfaceViewRenderer.init(sharedContext, rendererEvents,EglBase.CONFIG_RGBA, new GlDrawer());
-//            } else {
-//                surfaceViewRenderer.init(sharedContext, rendererEvents);
-//            }
-
+            final GlDrawer glDrawer = new GlDrawer();
+            glDrawer.setOomErrorCallback(new OOMErrorCallback() {
+                @Override
+                public void onError() {
+                    try {
+                        getHandler().post(new Runnable() {
+                            @Override
+                            public void run() {
+                                reAttachVideoRenderer();
+                            }
+                        });
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+            surfaceViewRenderer.init(sharedContext, rendererEvents, EglBase.CONFIG_RGBA, glDrawer);
             videoRenderer = new VideoRenderer(surfaceViewRenderer);
             videoTrack.addRenderer(videoRenderer);
         }
+    }
+
+    private void reAttachVideoRenderer() {
+        removeRendererFromVideoTrack();
+        getHandler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                tryAddRendererToVideoTrack();
+            }
+        }, 1000);
+    }
+    public interface OOMErrorCallback {
+        void onError();
     }
 }
 
