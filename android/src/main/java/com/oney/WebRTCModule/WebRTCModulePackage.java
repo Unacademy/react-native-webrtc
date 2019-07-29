@@ -30,7 +30,8 @@ public class WebRTCModulePackage implements ReactPackage {
     public List<ViewManager> createViewManagers(
             ReactApplicationContext reactContext) {
         return Arrays.<ViewManager>asList(
-            new RTCVideoViewManager()
+            new RTCVideoViewManager(),
+            new GreenScreenVideoViewManager()
         );
     }
 }
