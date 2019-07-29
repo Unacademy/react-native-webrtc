@@ -12,6 +12,7 @@ package com.oney.WebRTCModule;
 
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
+import android.util.Log;
 
 import org.webrtc.GlShader;
 import org.webrtc.GlUtil;
@@ -29,7 +30,14 @@ import java.util.Map;
  * manually to free the resources held by this object.
  */
 public class GlDrawer implements RendererCommon.GlDrawer {
-    // clang-format off
+    private WebRTCGreenScreenView.OOMErrorCallback oomErrorCallback;
+
+    // clang-format off˜
+
+    public void setOomErrorCallback(WebRTCGreenScreenView.OOMErrorCallback oomErrorCallback) {
+        this.oomErrorCallback = oomErrorCallback;
+    }
+
     // Simple vertex shader, used for both YUV and OES.
     private static final String VERTEX_SHADER_STRING =
             "varying vec2 interp_tc;\n"
@@ -59,27 +67,25 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     + "  vec4 sourcePixel = vec4(y + 1.403 * v, "
                     + "                      y - 0.344 * u - 0.714 * v, "
                     + "                      y + 1.77 * u, 1);\n"
-                    +"  float pixelSat, secondaryComponents;\n"
+                    +"  float pixelSat, secondaryComponents, secondaryComponents1;\n"
                     +"  float fmin = min(min(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
                     +"  float fmax = max(max(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
                     +"  vec4 screen = vec4(0.0,1.0,0.0,1.0);\n"
                     +"	float fmax1 = max(max(screen.r, screen.g), screen.b);\n"
+                    +"	float fmin1 = min(min(screen.r, screen.g), screen.b);\n"
                     +"  vec3 screenPrimary = step(fmax1, screen.rgb);\n"
                     +"  vec3 pixelPrimary = step(fmax, sourcePixel.rgb);\n"
                     +"  secondaryComponents = dot(1.0 - pixelPrimary, sourcePixel.rgb);\n"
-                    +"  float screenSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
+                    +"  secondaryComponents1 = dot(1.0 - screenPrimary, screen.rgb);\n"
+                    +"  float screenSat = fmax1 - mix(secondaryComponents1 - fmin1, secondaryComponents1 / 2.0, 1.0);\n"
                     +"  pixelSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
                     +"  float diffPrimary = dot(abs(pixelPrimary - screenPrimary), vec3(1.0));\n"
                     +"  float solid = step(1.0, step(pixelSat, 0.1) + step(fmax, 0.1) + diffPrimary);\n"
                     +"  float alpha = max(0.0, 1.0 - pixelSat / screenSat);\n"
                     +"  alpha = smoothstep(0.0, 1.0, alpha);\n"
                     +"  vec4 semiTransparentPixel = vec4((sourcePixel.rgb - (1.0 - alpha) * screen.rgb * 1.0) / max(0.00001, alpha), alpha);\n"
-                    +"  vec4 pixel = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, solid);\n"
-                    +"   gl_FragColor = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b,1.0);\n"
-                    +"if(solid == 0.0)\n"
-                    +"{\n"
-                    +"gl_FragColor=vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, 0.0);\n"
-                    +"}\n"
+                    +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
+                    +"  gl_FragColor=pixel;\n"
                     + "}\n";
 
     private static final String RGB_FRAGMENT_SHADER_STRING =
@@ -89,28 +95,26 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     + "uniform sampler2D rgb_tex;\n"
                     + "\n"
                     + "void main() {\n"
-                    +"  float pixelSat, secondaryComponents;\n"
+                    +"  float pixelSat, secondaryComponents, secondaryComponents1;\n"
                     +"  vec4 sourcePixel = texture2D(rgb_tex, interp_tc);\n"
                     +"  float fmin = min(min(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
                     +"  float fmax = max(max(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
                     +"  vec4 screen = vec4(0.0,1.0,0.0,1.0);\n"
                     +"	float fmax1 = max(max(screen.r, screen.g), screen.b);\n"
+                    +"	float fmin1 = min(min(screen.r, screen.g), screen.b);\n"
                     +"  vec3 screenPrimary = step(fmax1, screen.rgb);\n"
                     +"  vec3 pixelPrimary = step(fmax, sourcePixel.rgb);\n"
                     +"  secondaryComponents = dot(1.0 - pixelPrimary, sourcePixel.rgb);\n"
-                    +"  float screenSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
+                    +"  secondaryComponents1 = dot(1.0 - screenPrimary, screen.rgb);\n"
+                    +"  float screenSat = fmax1 - mix(secondaryComponents1 - fmin1, secondaryComponents1 / 2.0, 1.0);\n"
                     +"  pixelSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
                     +"  float diffPrimary = dot(abs(pixelPrimary - screenPrimary), vec3(1.0));\n"
                     +"  float solid = step(1.0, step(pixelSat, 0.1) + step(fmax, 0.1) + diffPrimary);\n"
                     +"  float alpha = max(0.0, 1.0 - pixelSat / screenSat);\n"
                     +"  alpha = smoothstep(0.0, 1.0, alpha);\n"
                     +"  vec4 semiTransparentPixel = vec4((sourcePixel.rgb - (1.0 - alpha) * screen.rgb * 1.0) / max(0.00001, alpha), alpha);\n"
-                    +"  vec4 pixel = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, solid);\n"
-                    +"   gl_FragColor = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b,1.0);\n"
-                    +"if(solid == 0.0)\n"
-                    +"{\n"
-                    +"gl_FragColor=vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, 0.0);\n"
-                    +"}\n"
+                    +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
+                    +"  gl_FragColor=pixel;\n"
                     + "}\n";
 
     private static final String OES_FRAGMENT_SHADER_STRING =
@@ -122,28 +126,26 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     + "varying mediump float text_alpha_out;\n"
                     + "\n"
                     + " void main() {\n"
-                    +"  float pixelSat, secondaryComponents;\n"
+                    +"  float pixelSat, secondaryComponents, secondaryComponents1;\n"
                     +"  vec4 sourcePixel = texture2D(oes_tex, interp_tc);\n"
                     +"  float fmin = min(min(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
                     +"  float fmax = max(max(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
                     +"  vec4 screen = vec4(0.0,1.0,0.0,1.0);\n"
                     +"	float fmax1 = max(max(screen.r, screen.g), screen.b);\n"
+                    +"	float fmin1 = min(min(screen.r, screen.g), screen.b);\n"
                     +"  vec3 screenPrimary = step(fmax1, screen.rgb);\n"
                     +"  vec3 pixelPrimary = step(fmax, sourcePixel.rgb);\n"
                     +"  secondaryComponents = dot(1.0 - pixelPrimary, sourcePixel.rgb);\n"
-                    +"  float screenSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
+                    +"  secondaryComponents1 = dot(1.0 - screenPrimary, screen.rgb);\n"
+                    +"  float screenSat = fmax1 - mix(secondaryComponents1 - fmin1, secondaryComponents1 / 2.0, 1.0);\n"
                     +"  pixelSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
                     +"  float diffPrimary = dot(abs(pixelPrimary - screenPrimary), vec3(1.0));\n"
                     +"  float solid = step(1.0, step(pixelSat, 0.1) + step(fmax, 0.1) + diffPrimary);\n"
                     +"  float alpha = max(0.0, 1.0 - pixelSat / screenSat);\n"
                     +"  alpha = smoothstep(0.0, 1.0, alpha);\n"
                     +"  vec4 semiTransparentPixel = vec4((sourcePixel.rgb - (1.0 - alpha) * screen.rgb * 1.0) / max(0.00001, alpha), alpha);\n"
-                    +"  vec4 pixel = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, solid);\n"
-                    +"   gl_FragColor = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b,1.0);\n"
-                    +"if(solid == 0.0)\n"
-                    +"{\n"
-                    +"gl_FragColor=vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, 0.0);\n"
-                    +"}\n"
+                    +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
+                    +"  gl_FragColor=pixel;\n"
                     + "}\n";
 
 
@@ -272,35 +274,41 @@ public class GlDrawer implements RendererCommon.GlDrawer {
     }
 
     private void prepareShader(String fragmentShader, float[] texMatrix) {
-        final Shader shader;
-        if (shaders.containsKey(fragmentShader)) {
-            shader = shaders.get(fragmentShader);
-        } else {
-            // Lazy allocation.
-            shader = new Shader(fragmentShader);
-            shaders.put(fragmentShader, shader);
-            shader.glShader.useProgram();
-            // Initialize fragment shader uniform values.
-            if (fragmentShader == YUV_FRAGMENT_SHADER_STRING) {
-                GLES20.glUniform1i(shader.glShader.getUniformLocation("y_tex"), 0);
-                GLES20.glUniform1i(shader.glShader.getUniformLocation("u_tex"), 1);
-                GLES20.glUniform1i(shader.glShader.getUniformLocation("v_tex"), 2);
-            } else if (fragmentShader == RGB_FRAGMENT_SHADER_STRING) {
-                GLES20.glUniform1i(shader.glShader.getUniformLocation("rgb_tex"), 0);
-            } else if (fragmentShader == OES_FRAGMENT_SHADER_STRING) {
-                GLES20.glUniform1i(shader.glShader.getUniformLocation("oes_tex"), 0);
-                //  GLES20.glUniform1f(shader.glShader.getUniformLocation("u_alpha"), 0.5f);
+        try {
+            final Shader shader;
+            if (shaders.containsKey(fragmentShader)) {
+                shader = shaders.get(fragmentShader);
             } else {
-                throw new IllegalStateException("Unknown fragment shader: " + fragmentShader);
+                // Lazy allocation.
+                shader = new Shader(fragmentShader);
+                shaders.put(fragmentShader, shader);
+                shader.glShader.useProgram();
+                // Initialize fragment shader uniform values.
+                if (fragmentShader == YUV_FRAGMENT_SHADER_STRING) {
+                    GLES20.glUniform1i(shader.glShader.getUniformLocation("y_tex"), 0);
+                    GLES20.glUniform1i(shader.glShader.getUniformLocation("u_tex"), 1);
+                    GLES20.glUniform1i(shader.glShader.getUniformLocation("v_tex"), 2);
+                } else if (fragmentShader == RGB_FRAGMENT_SHADER_STRING) {
+                    GLES20.glUniform1i(shader.glShader.getUniformLocation("rgb_tex"), 0);
+                } else if (fragmentShader == OES_FRAGMENT_SHADER_STRING) {
+                    GLES20.glUniform1i(shader.glShader.getUniformLocation("oes_tex"), 0);
+                    //  GLES20.glUniform1f(shader.glShader.getUniformLocation("u_alpha"), 0.5f);
+                } else {
+                    throw new IllegalStateException("Unknown fragment shader: " + fragmentShader);
+                }
+                GlUtil.checkNoGLES2Error("Initialize fragment shader uniform values.");
+                // Initialize vertex shader attributes.
+                shader.glShader.setVertexAttribArray("in_pos", 2, FULL_RECTANGLE_BUF);
+                shader.glShader.setVertexAttribArray("in_tc", 2, FULL_RECTANGLE_TEX_BUF);
             }
-            GlUtil.checkNoGLES2Error("Initialize fragment shader uniform values.");
-            // Initialize vertex shader attributes.
-            shader.glShader.setVertexAttribArray("in_pos", 2, FULL_RECTANGLE_BUF);
-            shader.glShader.setVertexAttribArray("in_tc", 2, FULL_RECTANGLE_TEX_BUF);
+            shader.glShader.useProgram();
+            // Copy the texture transformation matrix over.
+            GLES20.glUniformMatrix4fv(shader.texMatrixLocation, 1, false, texMatrix, 0);
+        } catch (Exception e) {
+            if (oomErrorCallback != null) {
+                oomErrorCallback.onError();
+            }
         }
-        shader.glShader.useProgram();
-        // Copy the texture transformation matrix over.
-        GLES20.glUniformMatrix4fv(shader.texMatrixLocation, 1, false, texMatrix, 0);
     }
 
     /**
