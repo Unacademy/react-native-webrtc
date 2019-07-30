@@ -15,6 +15,8 @@
 
 #import "RTCVideoViewManager.h"
 #import "WebRTCModule.h"
+#import "RTCUNShader.h"
+#import <GLKit/GLKit.h>
 
 /**
  * In the fashion of
@@ -23,20 +25,20 @@
  * the CSS style {@code object-fit}.
  */
 typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
-  /**
-   * The contain value defined by https://www.w3.org/TR/css3-images/#object-fit:
-   *
-   * The replaced content is sized to maintain its aspect ratio while fitting
-   * within the element's content box.
-   */
-  RTCVideoViewObjectFitContain,
-  /**
-   * The cover value defined by https://www.w3.org/TR/css3-images/#object-fit:
-   *
-   * The replaced content is sized to maintain its aspect ratio while filling
-   * the element's entire content box.
-   */
-  RTCVideoViewObjectFitCover
+    /**
+     * The contain value defined by https://www.w3.org/TR/css3-images/#object-fit:
+     *
+     * The replaced content is sized to maintain its aspect ratio while fitting
+     * within the element's content box.
+     */
+    RTCVideoViewObjectFitContain,
+    /**
+     * The cover value defined by https://www.w3.org/TR/css3-images/#object-fit:
+     *
+     * The replaced content is sized to maintain its aspect ratio while filling
+     * the element's entire content box.
+     */
+    RTCVideoViewObjectFitCover
 };
 
 /**
@@ -51,6 +53,12 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
  * applications choose to mirror the front/user-facing camera.
  */
 @property (nonatomic) BOOL mirror;
+
+/**
+ * The indicator which determines whether this {@code RTCVideoView} is to remove
+ * green color during rendering.
+ */
+@property (nonatomic) BOOL useGreenScreen;
 
 /**
  * In the fashion of
@@ -75,10 +83,11 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
 @end
 
 @implementation RTCVideoView {
-  /**
-   * The width and height of the video (frames) rendered by {@link #subview}.
-   */
-  CGSize _videoSize;
+    /**
+     * The width and height of the video (frames) rendered by {@link #subview}.
+     */
+    CGSize _videoSize;
+    BOOL _isVideoInit;
 }
 
 @synthesize videoView = _videoView;
@@ -104,7 +113,6 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
       _videoSize.width = 0;
       [self setNeedsLayout];
     }
-  }
 }
 
 /**
@@ -114,24 +122,50 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
  * @param frame The frame rectangle for the view, measured in points.
  */
 - (instancetype)initWithFrame:(CGRect)frame {
-  if (self = [super initWithFrame:frame]) {
+    if (self = [super initWithFrame:frame]) {
+        if (self = [super initWithFrame:frame]) {
 #if defined(RTC_SUPPORTS_METAL)
-    RTCMTLVideoView *subview = [[RTCMTLVideoView alloc] initWithFrame:CGRectZero];
-    subview.delegate = self;
-    _videoView = subview;
+            RTCMTLVideoView *subview = [[RTCMTLVideoView alloc] initWithFrame:CGRectZero];
+            subview.delegate = self;
+            _videoView = subview;
 #else
-    RTCEAGLVideoView *subview = [[RTCEAGLVideoView alloc] initWithFrame:CGRectZero];
-    subview.delegate = self;
-    _videoView = subview;
+            RTCEAGLVideoView *subview = [[RTCEAGLVideoView alloc] initWithFrame:CGRectZero];
+            subview.delegate = self;
+            _videoView = subview;
 #endif
+            
+            _videoSize.height = 0;
+            _videoSize.width = 0;
+            
+            self.opaque = NO;
+            [self addSubview:self.videoView];
+        }
+        return self;
+}
 
+- (void)configureSubviews {
+    RTCEAGLVideoView *subview;
+    if (_useGreenScreen) {
+        subview = [[RTCEAGLVideoView alloc] initWithFrame:self.frame shader:[[RTCUNShader alloc] init]];
+    } else {
+        subview = [[RTCEAGLVideoView alloc] initWithFrame:self.frame];
+    }
+    
+    subview.delegate = self;
+    
+    if (subview && [subview.subviews count] > 0) {
+        GLKView *glkView = subview.subviews[0];
+        if (glkView) {
+            glkView.backgroundColor = [UIColor clearColor];
+        }
+    }
+    
     _videoSize.height = 0;
     _videoSize.width = 0;
-
+    
     self.opaque = NO;
-    [self addSubview:self.videoView];
-  }
-  return self;
+    _isVideoInit = true;
+    [self addSubview:subview];
 }
 
 /**
@@ -191,8 +225,8 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
 
   subview.transform
     = self.mirror
-        ? CGAffineTransformMakeScale(-1.0, 1.0)
-        : CGAffineTransformIdentity;
+    ? CGAffineTransformMakeScale(-1.0, 1.0)
+    : CGAffineTransformIdentity;
 }
 
 /**
@@ -203,10 +237,19 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
  * {@code RTCVideoView}.
  */
 - (void)setMirror:(BOOL)mirror {
-  if (_mirror != mirror) {
-      _mirror = mirror;
-      [self setNeedsLayout];
-  }
+    if (_mirror != mirror) {
+        _mirror = mirror;
+        [self setNeedsLayout];
+    }
+}
+
+- (void)setUseGreenScreen:(BOOL)useGreenScreen {
+    if (_useGreenScreen != useGreenScreen) {
+        _useGreenScreen = useGreenScreen;
+    }
+    if (!_isVideoInit) {
+        [self configureSubviews];
+    }
 }
 
 /**
@@ -281,16 +324,18 @@ typedef NS_ENUM(NSInteger, RTCVideoViewObjectFit) {
 RCT_EXPORT_MODULE()
 
 - (UIView *)view {
-  RTCVideoView *v = [[RTCVideoView alloc] init];
-  v.clipsToBounds = YES;
-  return v;
+    RTCVideoView *v = [[RTCVideoView alloc] init];
+    v.clipsToBounds = YES;
+    return v;
 }
 
 - (dispatch_queue_t)methodQueue {
-  return dispatch_get_main_queue();
+    return dispatch_get_main_queue();
 }
 
 RCT_EXPORT_VIEW_PROPERTY(mirror, BOOL)
+
+RCT_EXPORT_VIEW_PROPERTY(useGreenScreen, BOOL)
 
 /**
  * In the fashion of
@@ -299,13 +344,13 @@ RCT_EXPORT_VIEW_PROPERTY(mirror, BOOL)
  * the CSS style {@code object-fit}.
  */
 RCT_CUSTOM_VIEW_PROPERTY(objectFit, NSString *, RTCVideoView) {
-  NSString *s = [RCTConvert NSString:json];
-  RTCVideoViewObjectFit e
+    NSString *s = [RCTConvert NSString:json];
+    RTCVideoViewObjectFit e
     = (s && [s isEqualToString:@"cover"])
-      ? RTCVideoViewObjectFitCover
-      : RTCVideoViewObjectFitContain;
-
-  view.objectFit = e;
+    ? RTCVideoViewObjectFitCover
+    : RTCVideoViewObjectFitContain;
+    
+    view.objectFit = e;
 }
 
 RCT_CUSTOM_VIEW_PROPERTY(streamURL, NSString *, RTCVideoView) {
