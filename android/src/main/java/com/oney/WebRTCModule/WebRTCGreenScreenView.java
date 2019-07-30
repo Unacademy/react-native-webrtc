@@ -21,7 +21,6 @@ import org.webrtc.MediaStream;
 import org.webrtc.RendererCommon;
 import org.webrtc.RendererCommon.RendererEvents;
 import org.webrtc.RendererCommon.ScalingType;
-import org.webrtc.VideoRenderer;
 import org.webrtc.VideoTrack;
 
 public class WebRTCGreenScreenView extends ViewGroup {
@@ -161,24 +160,21 @@ public class WebRTCGreenScreenView extends ViewGroup {
      * The {@link View} and {@link VideoSink} implementation which
      * actually renders {@link #videoTrack} on behalf of this instance.
      */
-    private ViewRenderInterface surfaceViewRenderer;
+    private UnSurfaceViewRenderer surfaceViewRenderer;
 
     /**
      * The {@code VideoTrack}, if any, rendered by this {@code WebRTCGreenScreenView}.
      */
     private VideoTrack videoTrack;
 
-    private UnSurfaceViewRenderer unSurfaceViewRenderer;
-
     public WebRTCGreenScreenView(Context context) {
         super(context);
-        unSurfaceViewRenderer = new UnSurfaceViewRenderer(getContext());
-        surfaceViewRenderer = (ViewRenderInterface) unSurfaceViewRenderer;
-        addView(unSurfaceViewRenderer);
+        surfaceViewRenderer = new UnSurfaceViewRenderer(getContext());
+        addView(surfaceViewRenderer);
         setMirror(true);
         setScalingType(DEFAULT_SCALING_TYPE);
         setBackgroundColor(Color.TRANSPARENT);
-        unSurfaceViewRenderer.setGreenScreenFlags();
+        surfaceViewRenderer.setGreenScreenFlags();
     }
 
 //    public void setUseGreenScreen(boolean useGreenScreen) {
