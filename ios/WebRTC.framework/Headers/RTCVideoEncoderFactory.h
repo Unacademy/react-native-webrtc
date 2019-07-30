@@ -10,25 +10,17 @@
 
 #import <Foundation/Foundation.h>
 
-#import <WebRTC/RTCMacros.h>
-#import <WebRTC/RTCVideoCodec.h>
+#import "RTCMacros.h"
+#import "RTCVideoCodecInfo.h"
+#import "RTCVideoEncoder.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 /** RTCVideoEncoderFactory is an Objective-C version of webrtc::VideoEncoderFactory. */
-RTC_EXPORT
+RTC_OBJC_EXPORT
 @protocol RTCVideoEncoderFactory <NSObject>
 
-- (id<RTCVideoEncoder>)createEncoder:(RTCVideoCodecInfo *)info;
-- (NSArray<RTCVideoCodecInfo *> *)supportedCodecs;  // TODO(andersc): "supportedFormats" instead?
-
-@end
-
-/** RTCVideoDecoderFactory is an Objective-C version of webrtc::VideoDecoderFactory. */
-RTC_EXPORT
-@protocol RTCVideoDecoderFactory <NSObject>
-
-- (id<RTCVideoDecoder>)createDecoder:(RTCVideoCodecInfo *)info;
+- (nullable id<RTCVideoEncoder>)createEncoder:(RTCVideoCodecInfo *)info;
 - (NSArray<RTCVideoCodecInfo *> *)supportedCodecs;  // TODO(andersc): "supportedFormats" instead?
 
 @end

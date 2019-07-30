@@ -6,16 +6,18 @@ import RTCSessionDescription from './RTCSessionDescription';
 import RTCView from './RTCView';
 import MediaStream from './MediaStream';
 import MediaStreamTrack from './MediaStreamTrack';
-import getUserMedia from './getUserMedia';
+import mediaDevices from './MediaDevices';
+import permissions from './Permissions';
 import GreenScreenView from './GreenScreenView'
 
-module.exports = {
+export {
   RTCPeerConnection,
   RTCIceCandidate,
   RTCSessionDescription,
   RTCView,
   MediaStream,
   MediaStreamTrack,
-  getUserMedia,
+  mediaDevices,
+  permissions,
   GreenScreenView
 };

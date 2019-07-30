@@ -25,11 +25,7 @@ type SourceInfo = {
   kind: string;
 };
 
-export default class MediaStreamTrack extends EventTarget(MEDIA_STREAM_TRACK_EVENTS) {
-  static getSources(success: (sources: Array<SourceInfo>) => void) {
-    WebRTCModule.mediaStreamTrackGetSources(success);
-  }
-
+class MediaStreamTrack extends EventTarget(MEDIA_STREAM_TRACK_EVENTS) {
   _enabled: boolean;
   id: string;
   kind: string;
@@ -74,13 +70,9 @@ export default class MediaStreamTrack extends EventTarget(MEDIA_STREAM_TRACK_EVE
   }
 
   stop() {
-    if (this.remote) {
-      return;
-    }
-    WebRTCModule.mediaStreamTrackStop(this.id);
-    this._enabled = false;
+    WebRTCModule.mediaStreamTrackSetEnabled(this.id, false);
     this.readyState = 'ended';
-    this.muted = !this._enabled;
+    // TODO: save some stopped flag?
   }
 
   /**
@@ -119,4 +111,10 @@ export default class MediaStreamTrack extends EventTarget(MEDIA_STREAM_TRACK_EVE
   getSettings() {
     throw new Error('Not implemented.');
   }
+
+  release() {
+    WebRTCModule.mediaStreamTrackRelease(this.id);
+  }
 }
+
+export default MediaStreamTrack;

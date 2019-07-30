@@ -11,16 +11,27 @@
 #import <React/RCTEventDispatcher.h>
 #import <React/RCTUtils.h>
 
+#import <WebRTC/RTCDefaultVideoDecoderFactory.h>
+#import <WebRTC/RTCDefaultVideoEncoderFactory.h>
+#import <WebRTC/RTCFieldTrials.h>
+
 #import "WebRTCModule.h"
 #import "WebRTCModule+RTCPeerConnection.h"
 
 @interface WebRTCModule ()
+
+@property(nonatomic, strong) dispatch_queue_t workerQueue;
 
 @end
 
 @implementation WebRTCModule
 
 @synthesize bridge = _bridge;
+
++ (BOOL)requiresMainQueueSetup
+{
+    return NO;
+}
 
 - (void)dealloc
 {
@@ -41,14 +52,37 @@
 
 - (instancetype)init
 {
+    return [self initWithEncoderFactory:nil decoderFactory:nil];
+}
+
+- (instancetype)initWithEncoderFactory:(nullable id<RTCVideoEncoderFactory>)encoderFactory
+                        decoderFactory:(nullable id<RTCVideoDecoderFactory>)decoderFactory
+{
   self = [super init];
   if (self) {
-    _peerConnectionFactory = [RTCPeerConnectionFactory new];
-//    [RTCPeerConnectionFactory initializeSSL];
+    // Initialize field trial for solving audio issues after hold when using CallKit.
+    // See: https://bugs.chromium.org/p/webrtc/issues/detail?id=8126#c35
+    NSDictionary *fieldTrials = @{ @"WebRTC-Audio-iOS-Holding" : kRTCFieldTrialEnabledValue };
+    RTCInitFieldTrialDictionary(fieldTrials);
+
+    if (encoderFactory == nil) {
+      encoderFactory = [[RTCDefaultVideoEncoderFactory alloc] init];
+    }
+    if (decoderFactory == nil) {
+      decoderFactory = [[RTCDefaultVideoDecoderFactory alloc] init];
+    }
+    _peerConnectionFactory
+      = [[RTCPeerConnectionFactory alloc] initWithEncoderFactory:encoderFactory
+                                                  decoderFactory:decoderFactory];
 
     _peerConnections = [NSMutableDictionary new];
     _localStreams = [NSMutableDictionary new];
     _localTracks = [NSMutableDictionary new];
+
+    dispatch_queue_attr_t attributes =
+    dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL,
+                                            QOS_CLASS_USER_INITIATED, -1);
+    _workerQueue = dispatch_queue_create("WebRTCModule.queue", attributes);
   }
   return self;
 }
@@ -72,7 +106,7 @@ RCT_EXPORT_MODULE();
 
 - (dispatch_queue_t)methodQueue
 {
-  return dispatch_get_main_queue();
+  return _workerQueue;
 }
 
 @end
