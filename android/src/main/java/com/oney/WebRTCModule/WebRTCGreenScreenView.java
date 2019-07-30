@@ -101,6 +101,12 @@ public class WebRTCGreenScreenView extends ViewGroup {
      */
     private boolean mirror;
 
+    /**
+     * Indicates if the {@link SurfaceViewRenderer} is attached to the video
+     * track.
+     */
+    private boolean rendererAttached;
+
     private String tempStreamUrl;
 
     /**
@@ -152,16 +158,10 @@ public class WebRTCGreenScreenView extends ViewGroup {
     private String streamURL;
 
     /**
-     * The {@link View} and {@link VideoRenderer#Callbacks} implementation which
+     * The {@link View} and {@link VideoSink} implementation which
      * actually renders {@link #videoTrack} on behalf of this instance.
      */
     private ViewRenderInterface surfaceViewRenderer;
-
-    /**
-     * The {@code VideoRenderer}, if any, which renders {@link #videoTrack} on
-     * this {@code View}.
-     */
-    private VideoRenderer videoRenderer;
 
     /**
      * The {@code VideoTrack}, if any, rendered by this {@code WebRTCGreenScreenView}.
@@ -194,8 +194,6 @@ public class WebRTCGreenScreenView extends ViewGroup {
      * opaque black and the surface part to transparent.
      */
     private void cleanSurfaceViewRenderer() {
-        ViewRenderInterface surfaceViewRenderer
-            = getSurfaceViewRenderer();
         surfaceViewRenderer.setBackgroundColor(Color.TRANSPARENT);
 //        if (this.useGreenScreen) {
 //            surfaceViewRenderer.setBackgroundColor(Color.TRANSPARENT);
@@ -203,20 +201,6 @@ public class WebRTCGreenScreenView extends ViewGroup {
 //            surfaceViewRenderer.setBackgroundColor(Color.BLACK);
 //        }
         surfaceViewRenderer.clearImage();
-    }
-
-    /**
-     * Gets the {@code SurfaceViewRenderer} which renders {@link #videoTrack}.
-     * Explicitly defined and used in order to facilitate switching the instance
-     * at compile time. For example, reduces the number of modifications
-     * necessary to switch the implementation from a {@code SurfaceViewRenderer}
-     * that is a child of a {@code WebRTCGreenScreenView} to {@code WebRTCGreenScreenView} extending
-     * {@code SurfaceViewRenderer}.
-     *
-     * @return The {@code SurfaceViewRenderer} which renders {@code videoTrack}.
-     */
-    private ViewRenderInterface getSurfaceViewRenderer() {
-        return surfaceViewRenderer;
     }
 
     /**
@@ -322,7 +306,7 @@ public class WebRTCGreenScreenView extends ViewGroup {
             @Override
             public void run() {
                 Log.d(TAG, "First frame rendered.");
-                getSurfaceViewRenderer().setBackgroundColor(Color.TRANSPARENT);
+                surfaceViewRenderer.setBackgroundColor(Color.TRANSPARENT);
             }
         });
     }
@@ -419,7 +403,7 @@ public class WebRTCGreenScreenView extends ViewGroup {
                 break;
             }
         }
-        getSurfaceViewRenderer().layout(l, t, r, b);
+        surfaceViewRenderer.layout(l, t, r, b);
     }
 
     /**
@@ -427,25 +411,23 @@ public class WebRTCGreenScreenView extends ViewGroup {
      * resources (if rendering is in progress).
      */
     private void removeRendererFromVideoTrack() {
-        if (videoRenderer != null) {
+        if (rendererAttached) {
 
 
             // XXX If WebRTCModule#mediaStreamTrackRelease has already been
             // invoked on videoTrack, then it is no longer safe to call methods
-            // (e.g. addRenderer, removeRenderer) on videoTrack. It is OK to
-            // skip the removeRenderer invocation in such a case because
+            // (e.g. addSink, removeSink) on videoTrack. It is OK to
+            // skip the removeSink invocation in such a case because
             // VideoTrack#dispose() has performed it already.
             VideoTrack videoTrack = getVideoTrack();
 
             if (videoTrack != null) {
-                videoTrack.removeRenderer(videoRenderer);
+                videoTrack.removeSink(surfaceViewRenderer);
             }
 
-            // XXX VideoRenderer#dispose() supports multiple invocations.
-            videoRenderer.dispose();
-            videoRenderer = null;
+            surfaceViewRenderer.release();
+            rendererAttached = false;
 
-            getSurfaceViewRenderer().release();
 
             // Since this WebRTCGreenScreenView is no longer rendering anything, make sure
             // surfaceViewRenderer displays nothing as well.
@@ -467,7 +449,7 @@ public class WebRTCGreenScreenView extends ViewGroup {
     private void requestSurfaceViewRendererLayout() {
         // Google/WebRTC just call requestLayout() on surfaceViewRenderer when
         // they change the value of its mirror or surfaceType property.
-        getSurfaceViewRenderer().requestLayout();
+        surfaceViewRenderer.requestLayout();
         // The above is not enough though when the video frame's dimensions or
         // rotation change. The following will suffice.
         if (!invokeIsInLayout()) {
@@ -488,8 +470,6 @@ public class WebRTCGreenScreenView extends ViewGroup {
     public void setMirror(boolean mirror) {
         if (this.mirror != mirror) {
             this.mirror = mirror;
-
-            ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
 
             surfaceViewRenderer.setMirror(mirror);
             // SurfaceViewRenderer takes the value of its mirror property into
@@ -518,8 +498,6 @@ public class WebRTCGreenScreenView extends ViewGroup {
     }
 
     private void setScalingType(ScalingType scalingType) {
-        ViewRenderInterface surfaceViewRenderer;
-
         synchronized (layoutSyncRoot) {
             if (this.scalingType == scalingType) {
                 return;
@@ -527,7 +505,6 @@ public class WebRTCGreenScreenView extends ViewGroup {
 
             this.scalingType = scalingType;
 
-            surfaceViewRenderer = getSurfaceViewRenderer();
             surfaceViewRenderer.setScalingType(scalingType);
         }
         // Both this instance ant its SurfaceViewRenderer take the value of
@@ -617,7 +594,6 @@ public class WebRTCGreenScreenView extends ViewGroup {
      * @param zOrder The z-order to set on this {@code WebRTCGreenScreenView}.
      */
     public void setZOrder(int zOrder) {
-        ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
 
         switch (zOrder) {
         case 0:
@@ -639,7 +615,7 @@ public class WebRTCGreenScreenView extends ViewGroup {
     private void tryAddRendererToVideoTrack() {
         VideoTrack videoTrack;
 
-        if (videoRenderer == null
+        if (!rendererAttached
                 // XXX If WebRTCModule#mediaStreamTrackRelease has already been
                 // invoked on videoTrack, then it is no longer safe to call
                 // methods (e.g. addRenderer, removeRenderer) on videoTrack.
@@ -654,7 +630,6 @@ public class WebRTCGreenScreenView extends ViewGroup {
                 return;
             }
 
-            ViewRenderInterface surfaceViewRenderer = getSurfaceViewRenderer();
             final GlDrawer glDrawer = new GlDrawer();
             glDrawer.setOomErrorCallback(new OOMErrorCallback() {
                 @Override
@@ -672,8 +647,8 @@ public class WebRTCGreenScreenView extends ViewGroup {
                 }
             });
             surfaceViewRenderer.init(sharedContext, rendererEvents, EglBase.CONFIG_RGBA, glDrawer);
-            videoRenderer = new VideoRenderer(surfaceViewRenderer);
-            videoTrack.addRenderer(videoRenderer);
+            videoTrack.addSink(surfaceViewRenderer);
+            rendererAttached = true;
         }
     }
 
