@@ -2,10 +2,12 @@
 
 import EventTarget from 'event-target-shim';
 import {DeviceEventEmitter, NativeModules} from 'react-native';
+import * as RTCUtil from './RTCUtil';
 
 import MediaStream from './MediaStream';
 import MediaStreamEvent from './MediaStreamEvent';
 import MediaStreamTrack from './MediaStreamTrack';
+import MediaStreamTrackEvent from './MediaStreamTrackEvent';
 import RTCDataChannel from './RTCDataChannel';
 import RTCDataChannelEvent from './RTCDataChannelEvent';
 import RTCSessionDescription from './RTCSessionDescription';
@@ -49,16 +51,6 @@ const DEFAULT_SDP_CONSTRAINTS = {
   optional: [],
 };
 
-/**
- * The default constraints of RTCPeerConnection's WebRTCModule.peerConnectionInit.
- */
-const DEFAULT_PC_CONSTRAINTS = {
-  mandatory: {},
-  optional: [
-    { DtlsSrtpKeyAgreement: true },
-  ],
-};
-
 const PEER_CONNECTION_EVENTS = [
   'connectionstatechange',
   'icecandidate',
@@ -96,6 +88,7 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
   onremovestream: ?Function;
 
   _peerConnectionId: number;
+  _localStreams: Array<MediaStream> = [];
   _remoteStreams: Array<MediaStream> = [];
   _subscriptions: Array<any>;
 
@@ -107,109 +100,114 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
   constructor(configuration) {
     super();
     this._peerConnectionId = nextPeerConnectionId++;
-    WebRTCModule.peerConnectionInit(
-        configuration,
-        DEFAULT_PC_CONSTRAINTS,
-        this._peerConnectionId);
+    WebRTCModule.peerConnectionInit(configuration, this._peerConnectionId);
     this._registerEvents();
   }
 
   addStream(stream: MediaStream) {
     WebRTCModule.peerConnectionAddStream(stream.reactTag, this._peerConnectionId);
+    this._localStreams.push(stream);
   }
 
   removeStream(stream: MediaStream) {
     WebRTCModule.peerConnectionRemoveStream(stream.reactTag, this._peerConnectionId);
-  }
-
-  /**
-   * Merge custom constraints with the default one. The custom one take precedence.
-   *
-   * @param {Object} options - webrtc constraints
-   * @return {Object} constraints - merged webrtc constraints
-   */
-  _mergeMediaConstraints(options) {
-    const constraints = Object.assign({}, DEFAULT_SDP_CONSTRAINTS);
-    if (options) {
-      if (options.mandatory) {
-        constraints.mandatory = {...constraints.mandatory, ...options.mandatory};
-      }
-      if (options.optional && Array.isArray(options.optional)) {
-        // `optional` is an array, webrtc only finds first and ignore the rest if duplicate.
-        constraints.optional = options.optional.concat(constraints.optional);
-      }
+    let index = this._localStreams.indexOf(stream);
+    if (index !== -1) {
+      this._localStreams.splice(index, 1);
     }
-    return constraints;
   }
 
-  createOffer(successCallback: ?Function, failureCallback: ?Function, options) {
-    WebRTCModule.peerConnectionCreateOffer(
+  createOffer(options) {
+    return new Promise((resolve, reject) => {
+      WebRTCModule.peerConnectionCreateOffer(
         this._peerConnectionId,
-        this._mergeMediaConstraints(options),
+        RTCUtil.mergeMediaConstraints(options, DEFAULT_SDP_CONSTRAINTS),
         (successful, data) => {
           if (successful) {
-            successCallback(new RTCSessionDescription(data));
+            resolve(new RTCSessionDescription(data));
           } else {
-            failureCallback(data); // TODO: convert to NavigatorUserMediaError
+            reject(data); // TODO: convert to NavigatorUserMediaError
           }
         });
+    });
   }
 
-  createAnswer(successCallback: ?Function, failureCallback: ?Function, options) {
-    WebRTCModule.peerConnectionCreateAnswer(
+  createAnswer(options) {
+    return new Promise((resolve, reject) => {
+      WebRTCModule.peerConnectionCreateAnswer(
         this._peerConnectionId,
-        this._mergeMediaConstraints(options),
+        RTCUtil.mergeMediaConstraints(options, DEFAULT_SDP_CONSTRAINTS),
         (successful, data) => {
           if (successful) {
-            successCallback(new RTCSessionDescription(data));
+            resolve(new RTCSessionDescription(data));
           } else {
-            failureCallback(data);
+            reject(data);
           }
         });
+    });
   }
 
   setConfiguration(configuration) {
     WebRTCModule.peerConnectionSetConfiguration(configuration, this._peerConnectionId);
   }
 
-  setLocalDescription(sessionDescription: RTCSessionDescription, success: ?Function, failure: ?Function, constraints) {
-    WebRTCModule.peerConnectionSetLocalDescription(sessionDescription.toJSON(), this._peerConnectionId, (successful, data) => {
-      if (successful) {
-        this.localDescription = sessionDescription;
-        success();
-      } else {
-        failure(data);
-      }
+  setLocalDescription(sessionDescription: RTCSessionDescription) {
+    return new Promise((resolve, reject) => {
+      WebRTCModule.peerConnectionSetLocalDescription(
+        sessionDescription.toJSON ? sessionDescription.toJSON() : sessionDescription,
+        this._peerConnectionId,
+        (successful, data) => {
+          if (successful) {
+            this.localDescription = sessionDescription;
+            resolve();
+          } else {
+            reject(data);
+          }
+      });
     });
   }
 
-  setRemoteDescription(sessionDescription: RTCSessionDescription, success: ?Function, failure: ?Function) {
-    WebRTCModule.peerConnectionSetRemoteDescription(sessionDescription.toJSON(), this._peerConnectionId, (successful, data) => {
-      if (successful) {
-        this.remoteDescription = sessionDescription;
-        success();
-      } else {
-        failure(data);
-      }
+  setRemoteDescription(sessionDescription: RTCSessionDescription) {
+    return new Promise((resolve, reject) => {
+      WebRTCModule.peerConnectionSetRemoteDescription(
+        sessionDescription.toJSON ? sessionDescription.toJSON() : sessionDescription,
+        this._peerConnectionId,
+        (successful, data) => {
+          if (successful) {
+            this.remoteDescription = sessionDescription;
+            resolve();
+          } else {
+            reject(data);
+          }
+      });
     });
   }
 
-  addIceCandidate(candidate, success, failure) { // TODO: success, failure
-    WebRTCModule.peerConnectionAddICECandidate(candidate.toJSON(), this._peerConnectionId, (successful) => {
-      if (successful) {
-        success && success();
-      } else {
-        failure && failure();
-      }
+  addIceCandidate(candidate) {
+    return new Promise((resolve, reject) => {
+      WebRTCModule.peerConnectionAddICECandidate(
+        candidate.toJSON ? candidate.toJSON() : candidate,
+        this._peerConnectionId,
+        (successful) => {
+          if (successful) {
+            resolve()
+          } else {
+            // XXX: This should be OperationError
+            reject(new Error('Failed to add ICE candidate'));
+          }
+      });
     });
   }
 
-  getStats(track, success, failure) {
-    if (WebRTCModule.peerConnectionGetStats) {
+  getStats(track) {
+    // NOTE: This returns a Promise but the format of the results is still
+    // the "legacy" one. The native side (in Oobj-C) doesn't yet support the
+    // new format: https://bugs.chromium.org/p/webrtc/issues/detail?id=6872
+    return new Promise((resolve, reject) => {
       WebRTCModule.peerConnectionGetStats(
         (track && track.id) || '',
         this._peerConnectionId,
-        stats => {
+        (success, data) => {
           if (success) {
             // On both Android and iOS it is faster to construct a single
             // JSON string representing the array of StatsReports and have it
@@ -218,20 +216,21 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
             // general, the stress is on being faster to pass through the React
             // Native bridge which is a bottleneck that tends to be visible in
             // the UI when there is congestion involving UI-related passing.
-            if (typeof stats === 'string') {
-              try {
-                stats = JSON.parse(stats);
-              } catch (e) {
-                failure(e);
-                return;
-              }
+            try {
+              const stats = JSON.parse(data);
+              resolve(stats);
+            } catch (e) {
+              reject(e);
             }
-            success(stats);
+          } else {
+            reject(new Error(data));
           }
         });
-    } else {
-      console.warn('RTCPeerConnection getStats not supported');
-    }
+    });
+  }
+
+  getLocalStreams() {
+    return this._localStreams.slice();
   }
 
   getRemoteStreams() {
@@ -240,6 +239,14 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
 
   close() {
     WebRTCModule.peerConnectionClose(this._peerConnectionId);
+  }
+
+  _getTrack(streamReactTag, trackId): MediaStreamTrack {
+    const stream
+      = this._remoteStreams.find(
+          stream => stream.reactTag === streamReactTag);
+
+    return stream && stream._tracks.find(track => track.id === trackId);
   }
 
   _unregisterEvents(): void {
@@ -297,6 +304,17 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
           }
         }
         this.dispatchEvent(new MediaStreamEvent('removestream', {stream}));
+      }),
+      DeviceEventEmitter.addListener('mediaStreamTrackMuteChanged', ev => {
+        if (ev.peerConnectionId !== this._peerConnectionId) {
+          return;
+        }
+        const track = this._getTrack(ev.streamReactTag, ev.trackId);
+        if (track) {
+          track.muted = ev.muted;
+          const eventName = ev.muted ? 'mute' : 'unmute';
+          track.dispatchEvent(new MediaStreamTrackEvent(eventName, {track}));
+        }
       }),
       DeviceEventEmitter.addListener('peerConnectionGotICECandidate', ev => {
         if (ev.id !== this._peerConnectionId) {

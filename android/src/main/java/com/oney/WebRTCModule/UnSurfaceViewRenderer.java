@@ -25,11 +25,9 @@ import org.webrtc.RendererCommon.VideoLayoutMeasure;
 import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.ThreadUtils;
 import org.webrtc.VideoFrame;
-import org.webrtc.VideoRenderer.Callbacks;
-import org.webrtc.VideoRenderer.I420Frame;
 import org.webrtc.VideoSink;
 
-public class UnSurfaceViewRenderer extends SurfaceView implements Callback, Callbacks, VideoSink, ViewRenderInterface {
+public class UnSurfaceViewRenderer extends SurfaceView implements Callback, VideoSink {
     private static final String TAG = "SurfaceViewRenderer";
     private final String resourceName = this.getResourceName();
     private final VideoLayoutMeasure videoLayoutMeasure = new VideoLayoutMeasure();
@@ -167,10 +165,6 @@ public class UnSurfaceViewRenderer extends SurfaceView implements Callback, Call
         this.eglRenderer.pauseVideo();
     }
 
-    public void renderFrame(I420Frame frame) {
-        this.updateFrameDimensionsAndReportEvents(frame);
-        this.eglRenderer.renderFrame(frame);
-    }
 
     public void onFrame(VideoFrame frame) {
         this.updateFrameDimensionsAndReportEvents(frame);
@@ -261,39 +255,6 @@ public class UnSurfaceViewRenderer extends SurfaceView implements Callback, Call
 
     public void clearImage() {
         this.eglRenderer.clearImage();
-    }
-
-    private void updateFrameDimensionsAndReportEvents(I420Frame frame) {
-        Object var2 = this.layoutLock;
-        synchronized (this.layoutLock) {
-            if (!this.isRenderingPaused) {
-                if (!this.isFirstFrameRendered) {
-                    this.isFirstFrameRendered = true;
-                    this.logD("Reporting first rendered frame.");
-                    if (this.rendererEvents != null) {
-                        this.rendererEvents.onFirstFrameRendered();
-                    }
-                }
-
-                if (this.rotatedFrameWidth != frame.rotatedWidth() || this.rotatedFrameHeight != frame.rotatedHeight() || this.frameRotation != frame.rotationDegree) {
-                    this.logD("Reporting frame resolution changed to " + frame.width + "x" + frame.height + " with rotation " + frame.rotationDegree);
-                    if (this.rendererEvents != null) {
-                        this.rendererEvents.onFrameResolutionChanged(frame.width, frame.height, frame.rotationDegree);
-                    }
-
-                    this.rotatedFrameWidth = frame.rotatedWidth();
-                    this.rotatedFrameHeight = frame.rotatedHeight();
-                    this.frameRotation = frame.rotationDegree;
-                    this.post(new Runnable() {
-                        public void run() {
-                            UnSurfaceViewRenderer.this.updateSurfaceSize();
-                            UnSurfaceViewRenderer.this.requestLayout();
-                        }
-                    });
-                }
-
-            }
-        }
     }
 
     private void updateFrameDimensionsAndReportEvents(final VideoFrame frame) {

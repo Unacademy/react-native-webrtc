@@ -85,6 +85,9 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     +"  alpha = smoothstep(0.0, 1.0, alpha);\n"
                     +"  vec4 semiTransparentPixel = vec4((sourcePixel.rgb - (1.0 - alpha) * screen.rgb * 1.0) / max(0.00001, alpha), alpha);\n"
                     +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
+                    +"  if (pixel.a < 0.1) { \n"
+                    +"      pixel = vec4(1.0,1.0,1.0, 0.0); \n"
+                    +"  }\n"
                     +"  gl_FragColor=pixel;\n"
                     + "}\n";
 
@@ -114,6 +117,9 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     +"  alpha = smoothstep(0.0, 1.0, alpha);\n"
                     +"  vec4 semiTransparentPixel = vec4((sourcePixel.rgb - (1.0 - alpha) * screen.rgb * 1.0) / max(0.00001, alpha), alpha);\n"
                     +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
+                    +"  if (pixel.a < 0.1) { \n"
+                    +"      pixel = vec4(1.0,1.0,1.0, 0.0); \n"
+                    +"  }\n"
                     +"  gl_FragColor=pixel;\n"
                     + "}\n";
 
@@ -145,6 +151,9 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     +"  alpha = smoothstep(0.0, 1.0, alpha);\n"
                     +"  vec4 semiTransparentPixel = vec4((sourcePixel.rgb - (1.0 - alpha) * screen.rgb * 1.0) / max(0.00001, alpha), alpha);\n"
                     +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
+                    +"  if (pixel.a < 0.1) { \n"
+                    +"      pixel = vec4(1.0,1.0,1.0, 0.0); \n"
+                    +"  }\n"
                     +"  gl_FragColor=pixel;\n"
                     + "}\n";
 
