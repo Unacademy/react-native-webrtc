@@ -59,6 +59,11 @@ public class GreenScreenVideoViewManager extends SimpleViewManager<WebRTCGreenSc
     view.setStreamURL(streamURL);
   }
 
+  @ReactProp(name = "opacity")
+  public void setOpacity(WebRTCGreenScreenView view, float opacity) {
+    view.setGreenScreenAlpha(opacity);
+  }
+
   /**
    * Sets the z-order of a specific {@link WebRTCGreenScreenView} in the stacking space of
    * all {@code WebRTCGreenScreenView}s. For more details, refer to the documentation of

@@ -31,11 +31,15 @@ import java.util.Map;
  */
 public class GlDrawer implements RendererCommon.GlDrawer {
     private WebRTCGreenScreenView.OOMErrorCallback oomErrorCallback;
-
+    private float alpha = 1f;
     // clang-format off˜
 
     public void setOomErrorCallback(WebRTCGreenScreenView.OOMErrorCallback oomErrorCallback) {
         this.oomErrorCallback = oomErrorCallback;
+    }
+
+    public void setAlpha(float alpha) {
+        this.alpha = alpha;
     }
 
     // Simple vertex shader, used for both YUV and OES.
@@ -58,6 +62,7 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     + "uniform sampler2D y_tex;\n"
                     + "uniform sampler2D u_tex;\n"
                     + "uniform sampler2D v_tex;\n"
+                    + "uniform float u_alpha;\n"
                     + "\n"
                     + "void main() {\n"
                     // CSC according to http://www.fourcc.org/fccyvrgb.php
@@ -87,8 +92,12 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
                     +"  if (pixel.a < 0.1) { \n"
                     +"      pixel = vec4(1.0,1.0,1.0, 0.0); \n"
+                    +"      gl_FragColor=pixel;\n"
                     +"  }\n"
-                    +"  gl_FragColor=pixel;\n"
+                    +"  else {\n"
+                    +"      gl_FragColor=pixel;\n"
+                    +"      gl_FragColor.a=u_alpha;\n"
+                    +"  }\n"
                     + "}\n";
 
     private static final String RGB_FRAGMENT_SHADER_STRING =
@@ -96,6 +105,7 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     + "varying vec2 interp_tc;\n"
                     + "\n"
                     + "uniform sampler2D rgb_tex;\n"
+                    + "uniform float u_alpha;\n"
                     + "\n"
                     + "void main() {\n"
                     +"  float pixelSat, secondaryComponents, secondaryComponents1;\n"
@@ -119,8 +129,12 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
                     +"  if (pixel.a < 0.1) { \n"
                     +"      pixel = vec4(1.0,1.0,1.0, 0.0); \n"
+                    +"      gl_FragColor=pixel;\n"
                     +"  }\n"
-                    +"  gl_FragColor=pixel;\n"
+                    +"  else {\n"
+                    +"      gl_FragColor=pixel;\n"
+                    +"      gl_FragColor.a=u_alpha;\n"
+                    +"  }\n"
                     + "}\n";
 
     private static final String OES_FRAGMENT_SHADER_STRING =
@@ -129,6 +143,7 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     + "varying vec2 interp_tc;\n"
                     + "\n"
                     + "uniform samplerExternalOES oes_tex;\n"
+                    + "uniform float u_alpha;\n"
                     + "varying mediump float text_alpha_out;\n"
                     + "\n"
                     + " void main() {\n"
@@ -153,8 +168,12 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                     +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
                     +"  if (pixel.a < 0.1) { \n"
                     +"      pixel = vec4(1.0,1.0,1.0, 0.0); \n"
+                    +"      gl_FragColor=pixel;\n"
                     +"  }\n"
-                    +"  gl_FragColor=pixel;\n"
+                    +"  else {\n"
+                    +"      gl_FragColor=pixel;\n"
+                    +"      gl_FragColor.a=u_alpha;\n"
+                    +"  }\n"
                     + "}\n";
 
 
@@ -311,6 +330,7 @@ public class GlDrawer implements RendererCommon.GlDrawer {
                 shader.glShader.setVertexAttribArray("in_tc", 2, FULL_RECTANGLE_TEX_BUF);
             }
             shader.glShader.useProgram();
+            GLES20.glUniform1f(shader.glShader.getUniformLocation("u_alpha"), alpha);
             // Copy the texture transformation matrix over.
             GLES20.glUniformMatrix4fv(shader.texMatrixLocation, 1, false, texMatrix, 0);
         } catch (Exception e) {

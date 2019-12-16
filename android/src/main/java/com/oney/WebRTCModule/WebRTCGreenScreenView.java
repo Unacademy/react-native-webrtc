@@ -107,7 +107,8 @@ public class WebRTCGreenScreenView extends ViewGroup {
     private boolean rendererAttached;
 
     private String tempStreamUrl;
-
+    private float greenScreenAlpha = 1.0f;
+    private GlDrawer glDrawer;
     /**
      * The {@code RendererEvents} which listens to rendering events reported by
      * {@link #surfaceViewRenderer}.
@@ -626,7 +627,8 @@ public class WebRTCGreenScreenView extends ViewGroup {
                 return;
             }
 
-            final GlDrawer glDrawer = new GlDrawer();
+            glDrawer = new GlDrawer();
+            glDrawer.setAlpha(greenScreenAlpha);
             glDrawer.setOomErrorCallback(new OOMErrorCallback() {
                 @Override
                 public void onError() {
@@ -645,6 +647,13 @@ public class WebRTCGreenScreenView extends ViewGroup {
             surfaceViewRenderer.init(sharedContext, rendererEvents, EglBase.CONFIG_RGBA, glDrawer);
             videoTrack.addSink(surfaceViewRenderer);
             rendererAttached = true;
+        }
+    }
+
+    public void setGreenScreenAlpha(float greenScreenAlpha) {
+        this.greenScreenAlpha = greenScreenAlpha;
+        if (glDrawer != null) {
+            glDrawer.setAlpha(greenScreenAlpha);
         }
     }
 

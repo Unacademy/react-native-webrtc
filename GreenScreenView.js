@@ -29,7 +29,7 @@ const GreenScreenView = {
     objectFit: PropTypes.oneOf(['contain', 'cover']),
 
     streamURL: PropTypes.string,
-
+    opacity: PropTypes.number,
     /**
      * Similarly to the CSS property z-index, specifies the z-order of this
      * RTCView in the stacking space of all RTCViews. When RTCViews overlap,
