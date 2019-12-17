@@ -1,18 +1,59 @@
 package com.oney.WebRTCModule;
 
+import android.graphics.PointF;
+
 import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.SimpleViewManager;
 import com.facebook.react.uimanager.ThemedReactContext;
 
 import org.webrtc.MediaStream;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.annotation.Nullable;
+
 public class GreenScreenVideoViewManager extends SimpleViewManager<WebRTCGreenScreenView> {
   private static final String REACT_CLASS = "GreenScreenVideoView";
+  public static final int COMMAND_FADE_OUT_VIDEO = 1;
+  public static final int COMMAND_FADE_IN_VIDEO = 2;
+
 
   @Override
   public String getName() {
     return REACT_CLASS;
+  }
+
+  @Override
+  public Map<String, Integer> getCommandsMap() {
+    Map<String, Integer> map = new HashMap<>();
+
+    map.put("fadeOutVideo", COMMAND_FADE_OUT_VIDEO);
+    map.put("fadeInVideo", COMMAND_FADE_IN_VIDEO);
+    return map;
+  }
+
+  @Override
+  public void receiveCommand(WebRTCGreenScreenView view, int commandType, @Nullable ReadableArray args) {
+    switch (commandType) {
+      case COMMAND_FADE_OUT_VIDEO: {
+        //view.addPoint((float) args.getDouble(0), (float) args.getDouble(1));
+        view.fadeOutVideo();
+        return;
+      }
+      case COMMAND_FADE_IN_VIDEO: {
+        view.fadeInVideo();
+        return;
+      }
+      default:
+        throw new IllegalArgumentException(String.format(
+                "Unsupported command %d received by %s.",
+                commandType,
+                getClass().getSimpleName()));
+    }
   }
 
   @Override

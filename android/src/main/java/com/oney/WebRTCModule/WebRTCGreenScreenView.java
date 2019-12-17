@@ -669,5 +669,38 @@ public class WebRTCGreenScreenView extends ViewGroup {
     public interface OOMErrorCallback {
         void onError();
     }
+
+    ValueAnimator fadeValueAnimator = null;
+    public void fadeOutVideo() {
+        if (fadeValueAnimator != null && fadeValueAnimator.isRunning()) {
+            fadeValueAnimator.cancel();
+        }
+        fadeValueAnimator = ValueAnimator.ofFloat(1f, 0f);
+        fadeValueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                float value = (float) animation.getAnimatedValue();
+                setGreenScreenAlpha(value);
+            }
+        });
+        fadeValueAnimator.setDuration(150);
+        fadeValueAnimator.start();
+    }
+
+    public void fadeInVideo() {
+        if (fadeValueAnimator != null && fadeValueAnimator.isRunning()) {
+            fadeValueAnimator.cancel();
+        }
+        fadeValueAnimator = ValueAnimator.ofFloat(0f, 1f);
+        fadeValueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                float value = (float) animation.getAnimatedValue();
+                setGreenScreenAlpha(value);
+            }
+        });
+        fadeValueAnimator.setDuration(150);
+        fadeValueAnimator.start();
+    }
 }
 
