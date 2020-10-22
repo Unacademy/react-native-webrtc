@@ -19,4 +19,18 @@ final class ThreadUtils {
     public static void runOnExecutor(Runnable runnable) {
         executor.execute(runnable);
     }
+
+    public static void addExceptionHandlerForThread(Thread.UncaughtExceptionHandler h, String threadName) {
+        Thread t = getThreadByName(threadName);
+        if (t != null) {
+            t.setUncaughtExceptionHandler(h);
+        }
+    }
+
+    public static Thread getThreadByName(String threadName) {
+        for (Thread t : Thread.getAllStackTraces().keySet()) {
+            if (t.getName().equals(threadName) && t.isAlive()) return t;
+        }
+        return null;
+    }
 }

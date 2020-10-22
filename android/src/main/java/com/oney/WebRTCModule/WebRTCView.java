@@ -598,6 +598,13 @@ public class WebRTCView extends ViewGroup {
             }
 
             surfaceViewRenderer.init(sharedContext, rendererEvents);
+            Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
+                @Override
+                public void uncaughtException(Thread th, Throwable ex) {
+                    releaseSurface();
+                }
+            };
+            ThreadUtils.addExceptionHandlerForThread(h, "EglRenderer")
             videoTrack.addSink(surfaceViewRenderer);
 
             rendererAttached = true;

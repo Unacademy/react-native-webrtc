@@ -642,6 +642,13 @@ public class WebRTCGreenScreenView extends ViewGroup {
                 }
             });
             surfaceViewRenderer.init(sharedContext, rendererEvents, EglBase.CONFIG_RGBA, glDrawer);
+            Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
+                @Override
+                public void uncaughtException(Thread th, Throwable ex) {
+                    releaseSurface();
+                }
+            };
+            ThreadUtils.addExceptionHandlerForThread(h, "EglRenderer")
             videoTrack.addSink(surfaceViewRenderer);
             rendererAttached = true;
         }
