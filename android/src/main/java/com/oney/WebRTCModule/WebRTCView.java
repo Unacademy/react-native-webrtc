@@ -601,7 +601,7 @@ public class WebRTCView extends ViewGroup {
             Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
                 @Override
                 public void uncaughtException(Thread th, Throwable ex) {
-                    releaseSurface();
+                    surfaceViewRenderer.release();
                 }
             };
             ThreadUtils.addExceptionHandlerForThread(h, "EglRenderer")
