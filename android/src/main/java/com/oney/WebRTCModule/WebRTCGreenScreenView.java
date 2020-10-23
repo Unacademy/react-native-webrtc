@@ -9,6 +9,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.util.Log;
 
+import com.bugsnag.android.Bugsnag;
 import com.facebook.react.bridge.ReactContext;
 
 import java.lang.reflect.InvocationTargetException;
@@ -645,6 +646,7 @@ public class WebRTCGreenScreenView extends ViewGroup {
             Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
                 @Override
                 public void uncaughtException(Thread th, Throwable ex) {
+                    Bugsnag.notify(ex);
                     surfaceViewRenderer.release();
                 }
             };
