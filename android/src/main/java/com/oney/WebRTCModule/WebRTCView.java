@@ -604,7 +604,7 @@ public class WebRTCView extends ViewGroup {
                     surfaceViewRenderer.release();
                 }
             };
-            ThreadUtils.addExceptionHandlerForThread(h, "EglRenderer")
+            ThreadUtils.addExceptionHandlerForThread(h, "EglRenderer");
             videoTrack.addSink(surfaceViewRenderer);
 
             rendererAttached = true;
