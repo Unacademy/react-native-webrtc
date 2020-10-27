@@ -1,6 +1,7 @@
 package com.oney.WebRTCModule;
 
 import android.annotation.SuppressLint;
+import android.content.res.Resources;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Point;
