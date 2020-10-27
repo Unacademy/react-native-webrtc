@@ -654,7 +654,11 @@ public class WebRTCGreenScreenView extends ViewGroup {
                 Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
                     @Override
                     public void uncaughtException(Thread th, Throwable ex) {
-                        Bugsnag.notify("Webrtc green screen view error on thread: " + th.getName(), ex.getMessage(), ex.getStackTrace(), null);
+                        if(ex.getMessage() != null) {
+                            Bugsnag.notify("Webrtc green screen view error on thread: " + th.getName(), ex.getMessage(), ex.getStackTrace(), null);
+                        } else {
+                            Bugsnag.notify("Webrtc green screen view error on thread: " + th.getName(),"", ex.getStackTrace(), null);
+                        }
                         surfaceViewRenderer.release();
                     }
                 };
