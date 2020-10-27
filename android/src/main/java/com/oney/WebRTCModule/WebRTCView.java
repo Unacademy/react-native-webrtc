@@ -610,7 +610,7 @@ public class WebRTCView extends ViewGroup {
                 Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
                     @Override
                     public void uncaughtException(Thread th, Throwable ex) {
-                        Bugsnag.notify(ex);
+                        Bugsnag.notify("Webrtc view error on thread: " + th.getName(), ex.getMessage(), ex.getStackTrace(), null);
                         surfaceViewRenderer.release();
                     }
                 };
