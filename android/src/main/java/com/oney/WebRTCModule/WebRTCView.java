@@ -600,6 +600,12 @@ public class WebRTCView extends ViewGroup {
 
             surfaceViewRenderer.init(sharedContext, rendererEvents);
             try {
+                String threadName = "";
+                try {
+                    threadName = surfaceViewRenderer.getResources().getResourceEntryName(surfaceViewRenderer.getId()) + "EglRenderer";
+                } catch (Resources.NotFoundException exception) {
+                    threadName = "EglRenderer";
+                }
                 Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
                     @Override
                     public void uncaughtException(Thread th, Throwable ex) {
@@ -607,7 +613,7 @@ public class WebRTCView extends ViewGroup {
                         surfaceViewRenderer.release();
                     }
                 };
-                ThreadUtils.addExceptionHandlerForThread(h, "EglRenderer");
+                ThreadUtils.addExceptionHandlerForThread(h, threadName);
             } catch (Exception e) {
                 e.printStackTrace();
             }
