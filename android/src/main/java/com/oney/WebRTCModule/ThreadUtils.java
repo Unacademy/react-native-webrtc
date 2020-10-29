@@ -2,6 +2,7 @@ package com.oney.WebRTCModule;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import com.bugsnag.android.Bugsnag;
 
 final class ThreadUtils {
     /**
@@ -18,5 +19,18 @@ final class ThreadUtils {
      */
     public static void runOnExecutor(Runnable runnable) {
         executor.execute(runnable);
+    }
+
+    public static void addExceptionHandlerForThread(Thread.UncaughtExceptionHandler h, String threadName) {
+        boolean foundAThread = false;
+        for (Thread t : Thread.getAllStackTraces().keySet()) {
+            if (t.getName().equals(threadName) && t.isAlive()) {
+                foundAThread = true;
+                t.setUncaughtExceptionHandler(h);
+            }
+        }
+        if (!foundAThread) {
+            Bugsnag.notify(new IllegalAccessError("Thread not found in webrtc: " + threadName));
+        }
     }
 }

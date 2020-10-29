@@ -1,6 +1,7 @@
 package com.oney.WebRTCModule;
 
 import android.annotation.SuppressLint;
+import android.content.res.Resources;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Point;
@@ -9,6 +10,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.util.Log;
 
+import com.bugsnag.android.Bugsnag;
 import com.facebook.react.bridge.ReactContext;
 
 import java.lang.reflect.InvocationTargetException;
@@ -642,6 +644,28 @@ public class WebRTCGreenScreenView extends ViewGroup {
                 }
             });
             surfaceViewRenderer.init(sharedContext, rendererEvents, EglBase.CONFIG_RGBA, glDrawer);
+            try {
+                String threadName = "";
+                try {
+                    threadName = surfaceViewRenderer.getResources().getResourceEntryName(surfaceViewRenderer.getId()) + ": " + "EglRenderer";
+                } catch (Resources.NotFoundException exception) {
+                    threadName = "EglRenderer";
+                }
+                Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
+                    @Override
+                    public void uncaughtException(Thread th, Throwable ex) {
+                        if(ex.getMessage() != null) {
+                            Bugsnag.notify("Webrtc green screen view error on thread: " + th.getName(), ex.getMessage(), ex.getStackTrace(), null);
+                        } else {
+                            Bugsnag.notify("Webrtc green screen view error on thread: " + th.getName(),"", ex.getStackTrace(), null);
+                        }
+                        surfaceViewRenderer.release();
+                    }
+                };
+                ThreadUtils.addExceptionHandlerForThread(h, threadName);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             videoTrack.addSink(surfaceViewRenderer);
             rendererAttached = true;
         }
