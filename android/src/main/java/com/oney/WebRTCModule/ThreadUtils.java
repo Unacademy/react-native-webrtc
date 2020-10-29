@@ -22,18 +22,15 @@ final class ThreadUtils {
     }
 
     public static void addExceptionHandlerForThread(Thread.UncaughtExceptionHandler h, String threadName) {
-        Thread t = getThreadByName(threadName);
-        if (t != null) {
-            t.setUncaughtExceptionHandler(h);
-        } else {
+        boolean foundAThread = false;
+        for (Thread t : Thread.getAllStackTraces().keySet()) {
+            if (t.getName().equals(threadName) && t.isAlive()) {
+                foundAThread = true;
+                t.setUncaughtExceptionHandler(h);
+            }
+        }
+        if (!foundAThread) {
             Bugsnag.notify(new IllegalAccessError("Thread not found in webrtc: " + threadName));
         }
-    }
-
-    public static Thread getThreadByName(String threadName) {
-        for (Thread t : Thread.getAllStackTraces().keySet()) {
-            if (t.getName().equals(threadName) && t.isAlive()) return t;
-        }
-        return null;
     }
 }
