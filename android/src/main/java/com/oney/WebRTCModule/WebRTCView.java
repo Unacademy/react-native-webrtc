@@ -9,6 +9,7 @@ import androidx.core.view.ViewCompat;
 import android.view.View;
 import android.view.ViewGroup;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.bugsnag.android.Bugsnag;
 import com.facebook.react.bridge.ReactContext;
@@ -18,6 +19,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 import org.webrtc.EglBase;
+import org.webrtc.EglError;
 import org.webrtc.MediaStream;
 import org.webrtc.RendererCommon;
 import org.webrtc.RendererCommon.RendererEvents;
@@ -170,7 +172,13 @@ public class WebRTCView extends ViewGroup {
     public WebRTCView(Context context) {
         super(context);
 
-        surfaceViewRenderer = new SurfaceViewRenderer(context);
+        surfaceViewRenderer = new SurfaceViewRenderer(context, new EglError() {
+          @Override
+          public void onSurfaceCreationFailed(Exception e) {
+            Bugsnag.notify(e);
+            Toast.makeText(context, "Error in loading video. Please reopen the class", Toast.LENGTH_LONG).show();
+          }
+        });
         addView(surfaceViewRenderer);
 
         setMirror(false);
@@ -600,28 +608,6 @@ public class WebRTCView extends ViewGroup {
             }
 
             surfaceViewRenderer.init(sharedContext, rendererEvents);
-            try {
-                String threadName = "";
-                try {
-                    threadName = surfaceViewRenderer.getResources().getResourceEntryName(surfaceViewRenderer.getId()) + "EglRenderer";
-                } catch (Resources.NotFoundException exception) {
-                    threadName = "EglRenderer";
-                }
-                Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
-                    @Override
-                    public void uncaughtException(Thread th, Throwable ex) {
-                        if(ex.getMessage() != null) {
-                            Bugsnag.notify("Webrtc view error on thread: " + th.getName(), ex.getMessage(), ex.getStackTrace(), null);
-                        } else {
-                            Bugsnag.notify("Webrtc view error on thread: " + th.getName(), "", ex.getStackTrace(), null);
-                        }
-                        surfaceViewRenderer.release();
-                    }
-                };
-                ThreadUtils.addExceptionHandlerForThread(h, threadName);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
             videoTrack.addSink(surfaceViewRenderer);
 
             rendererAttached = true;
