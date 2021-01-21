@@ -12,6 +12,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.bugsnag.android.Bugsnag;
+import com.bugsnag.android.Severity;
 import com.facebook.react.bridge.ReactContext;
 
 import java.lang.reflect.InvocationTargetException;
@@ -175,8 +176,11 @@ public class WebRTCView extends ViewGroup {
         surfaceViewRenderer = new SurfaceViewRenderer(context, new EglError() {
           @Override
           public void onSurfaceCreationFailed(Exception e) {
-            Bugsnag.notify(e);
             Toast.makeText(context, "Error in loading video. Please reopen the class", Toast.LENGTH_LONG).show();
+            Bugsnag.notify(e, event -> {
+              event.setSeverity(Severity.INFO);
+              return true;
+            });
           }
         });
         addView(surfaceViewRenderer);

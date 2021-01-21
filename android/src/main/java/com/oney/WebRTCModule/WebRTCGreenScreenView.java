@@ -12,6 +12,7 @@ import android.widget.Toast;
 import androidx.core.view.ViewCompat;
 
 import com.bugsnag.android.Bugsnag;
+import com.bugsnag.android.Severity;
 import com.facebook.react.bridge.ReactContext;
 
 import org.webrtc.EglBase;
@@ -175,8 +176,11 @@ public class WebRTCGreenScreenView extends ViewGroup {
         surfaceViewRenderer = new UnSurfaceViewRenderer(getContext(), new EglError() {
           @Override
           public void onSurfaceCreationFailed(Exception e) {
-            Bugsnag.notify(e);
             Toast.makeText(context, "Error in loading video. Please reopen the class", Toast.LENGTH_LONG).show();
+            Bugsnag.notify(e, event -> {
+              event.setSeverity(Severity.INFO);
+              return true;
+            });
           }
         });
         addView(surfaceViewRenderer);

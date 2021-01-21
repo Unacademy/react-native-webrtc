@@ -28,6 +28,6 @@ android {
 
 dependencies {
     implementation 'com.facebook.react:react-native:+'
-    api 'com.bugsnag:bugsnag-android:4.22.3'
+    api 'com.bugsnag:bugsnag-android:5.2.2'
     api fileTree(dir: 'libs', include: ['*.jar'])
 }
