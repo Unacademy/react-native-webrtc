@@ -14,6 +14,8 @@ Pod::Spec.new do |s|
 
   s.platform            = :ios, '9.0'
 
+  s.public_header_files = 'ios/**/absl/*.h'
+  s.private_header_files = 'ios/**/absl/**/internal/*.h'
   s.preserve_paths      = 'ios/**/*'
   s.source_files        = 'ios/**/*.{h,m,mm}'
   s.libraries           = 'sqlite3', 'stdc++'
