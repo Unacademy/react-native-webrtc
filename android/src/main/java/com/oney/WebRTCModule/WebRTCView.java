@@ -183,7 +183,7 @@ public class WebRTCView extends ViewGroup {
                       return true;
                   });
               } catch (Exception exception) {
-                  e.printStackTrace();
+                  exception.printStackTrace();
               }
           }
         });

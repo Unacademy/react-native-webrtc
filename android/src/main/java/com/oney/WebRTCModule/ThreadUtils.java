@@ -33,7 +33,7 @@ final class ThreadUtils {
             try {
                 Bugsnag.notify(new IllegalAccessError("Thread not found in webrtc: " + threadName));
             } catch (Exception exception) {
-                e.printStackTrace();
+                exception.printStackTrace();
             }
         }
     }
