@@ -30,7 +30,11 @@ final class ThreadUtils {
             }
         }
         if (!foundAThread) {
-            Bugsnag.notify(new IllegalAccessError("Thread not found in webrtc: " + threadName));
+            try {
+                Bugsnag.notify(new IllegalAccessError("Thread not found in webrtc: " + threadName));
+            } catch (Exception exception) {
+                e.printStackTrace();
+            }
         }
     }
 }
