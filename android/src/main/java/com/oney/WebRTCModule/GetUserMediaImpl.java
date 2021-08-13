@@ -26,7 +26,7 @@ class GetUserMediaImpl {
      */
     private static final String TAG = WebRTCModule.TAG;
 
-    private final CameraEnumerator cameraEnumerator;
+    private CameraEnumerator cameraEnumerator = null;
     private final ReactApplicationContext reactContext;
 
     /**
@@ -48,18 +48,25 @@ class GetUserMediaImpl {
         //   1. Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
         //   2. all camera support level should greater than LEGACY
         //   see: https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#INFO_SUPPORTED_HARDWARE_LEVEL
-        if (Camera2Enumerator.isSupported(reactContext)) {
-            Log.d(TAG, "Creating video capturer using Camera2 API.");
-            cameraEnumerator = new Camera2Enumerator(reactContext);
-        } else {
-            Log.d(TAG, "Creating video capturer using Camera1 API.");
-            cameraEnumerator = new Camera1Enumerator(false);
+    }
+
+    private void setupCameraEnumerator(ReactApplicationContext reactContext) {
+        synchronized(this) {
+            if (cameraEnumerator == null) {
+                if (Camera2Enumerator.isSupported(reactContext)) {
+                    Log.d(TAG, "Creating video capturer using Camera2 API.");
+                    cameraEnumerator = new Camera2Enumerator(reactContext);
+                } else {
+                    Log.d(TAG, "Creating video capturer using Camera1 API.");
+                    cameraEnumerator = new Camera1Enumerator(false);
+                }
+            }
         }
     }
 
     private AudioTrack createAudioTrack(ReadableMap constraints) {
         MediaConstraints audioConstraints
-            = webRTCModule.parseMediaConstraints(constraints.getMap("audio"));
+                = webRTCModule.parseMediaConstraints(constraints.getMap("audio"));
 
         Log.d(TAG, "getUserMedia(audio): " + audioConstraints);
 
@@ -68,19 +75,20 @@ class GetUserMediaImpl {
         AudioSource audioSource = pcFactory.createAudioSource(audioConstraints);
         AudioTrack track = pcFactory.createAudioTrack(id, audioSource);
         tracks.put(
-            id,
-            new TrackPrivate(track, audioSource, /* videoCapturer */ null));
+                id,
+                new TrackPrivate(track, audioSource, /* videoCapturer */ null));
 
         return track;
     }
 
     private VideoTrack createVideoTrack(ReadableMap constraints) {
+        setupCameraEnumerator(reactContext);
         ReadableMap videoConstraintsMap = constraints.getMap("video");
 
         Log.d(TAG, "getUserMedia(video): " + videoConstraintsMap);
 
         VideoCaptureController videoCaptureController
-            = new VideoCaptureController(cameraEnumerator, videoConstraintsMap);
+                = new VideoCaptureController(cameraEnumerator, videoConstraintsMap);
         VideoCapturer videoCapturer = videoCaptureController.getVideoCapturer();
         if (videoCapturer == null) {
             return null;
@@ -101,13 +109,14 @@ class GetUserMediaImpl {
     }
 
     ReadableArray enumerateDevices() {
+        setupCameraEnumerator(reactContext);
         WritableArray array = Arguments.createArray();
         String[] devices = cameraEnumerator.getDeviceNames();
 
-        for(int i = 0; i < devices.length; ++i) {
+        for (int i = 0; i < devices.length; ++i) {
             WritableMap params = Arguments.createMap();
             if (cameraEnumerator.isFrontFacing(devices[i])) {
-               params.putString("facing", "front");
+                params.putString("facing", "front");
             } else {
                 params.putString("facing", "back");
             }
@@ -167,15 +176,15 @@ class GetUserMediaImpl {
         }
 
         if (audioTrack == null && videoTrack == null) {
-             // Fail with DOMException with name AbortError as per:
-             // https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
-             errorCallback.invoke("DOMException","AbortError");
-             return;
+            // Fail with DOMException with name AbortError as per:
+            // https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+            errorCallback.invoke("DOMException", "AbortError");
+            return;
         }
 
         String streamId = UUID.randomUUID().toString();
         MediaStream mediaStream
-            = webRTCModule.mFactory.createLocalMediaStream(streamId);
+                = webRTCModule.mFactory.createLocalMediaStream(streamId);
         WritableArray tracks = Arguments.createArray();
 
         for (MediaStreamTrack track : new MediaStreamTrack[]{audioTrack, videoTrack}) {
@@ -222,9 +231,9 @@ class GetUserMediaImpl {
         MediaStreamTrack track = getTrack(id);
         if (track == null) {
             Log.d(
-                TAG,
-                "mediaStreamTrackStop() No local MediaStreamTrack with id "
-                    + id);
+                    TAG,
+                    "mediaStreamTrackStop() No local MediaStreamTrack with id "
+                            + id);
             return;
         }
         track.setEnabled(false);
@@ -235,7 +244,7 @@ class GetUserMediaImpl {
         TrackPrivate track = tracks.remove(id);
         if (track != null) {
             VideoCaptureController videoCaptureController
-                = track.videoCaptureController;
+                    = track.videoCaptureController;
             if (videoCaptureController != null) {
                 if (videoCaptureController.stopCapture()) {
                     videoCaptureController.dispose();
@@ -274,11 +283,11 @@ class GetUserMediaImpl {
          * Initializes a new {@code TrackPrivate} instance.
          *
          * @param track
-         * @param mediaSource the {@code MediaSource} from which the specified
-         * {@code code} was created
+         * @param mediaSource   the {@code MediaSource} from which the specified
+         *                      {@code code} was created
          * @param videoCapturer the {@code VideoCapturer} from which the
-         * specified {@code mediaSource} was created if the specified
-         * {@code track} is a {@link VideoTrack}
+         *                      specified {@code mediaSource} was created if the specified
+         *                      {@code track} is a {@link VideoTrack}
          */
         public TrackPrivate(
                 MediaStreamTrack track,
