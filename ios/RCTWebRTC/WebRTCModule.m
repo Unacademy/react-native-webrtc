@@ -5,24 +5,24 @@
 //  Copyright © 2015 One. All rights reserved.
 //
 
+#if !TARGET_OS_OSX
 #import <UIKit/UIKit.h>
+#endif
 
 #import <React/RCTBridge.h>
 #import <React/RCTEventDispatcher.h>
 #import <React/RCTUtils.h>
 
+#import <WebRTC/RTCDefaultVideoDecoderFactory.h>
+#import <WebRTC/RTCDefaultVideoEncoderFactory.h>
+
 #import "WebRTCModule.h"
 #import "WebRTCModule+RTCPeerConnection.h"
 
 @interface WebRTCModule ()
-
-@property(nonatomic, strong) dispatch_queue_t workerQueue;
-
 @end
 
 @implementation WebRTCModule
-
-@synthesize bridge = _bridge;
 
 + (BOOL)requiresMainQueueSetup
 {
@@ -75,6 +75,7 @@
                                             QOS_CLASS_USER_INITIATED, -1);
     _workerQueue = dispatch_queue_create("WebRTCModule.queue", attributes);
   }
+
   return self;
 }
 
@@ -98,6 +99,23 @@ RCT_EXPORT_MODULE();
 - (dispatch_queue_t)methodQueue
 {
   return _workerQueue;
+}
+
+- (NSArray<NSString *> *)supportedEvents {
+  return @[
+    kEventPeerConnectionSignalingStateChanged,
+    kEventPeerConnectionStateChanged,
+    kEventPeerConnectionAddedStream,
+    kEventPeerConnectionRemovedStream,
+    kEventPeerConnectionOnRenegotiationNeeded,
+    kEventPeerConnectionIceConnectionChanged,
+    kEventPeerConnectionIceGatheringChanged,
+    kEventPeerConnectionGotICECandidate,
+    kEventPeerConnectionDidOpenDataChannel,
+    kEventDataChannelStateChanged,
+    kEventDataChannelReceiveMessage,
+    kEventMediaStreamTrackMuteChanged
+  ];
 }
 
 @end

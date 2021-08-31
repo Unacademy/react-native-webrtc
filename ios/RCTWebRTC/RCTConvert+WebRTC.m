@@ -1,4 +1,5 @@
 #import "RCTConvert+WebRTC.h"
+#import <React/RCTLog.h>
 #import <WebRTC/RTCDataChannelConfiguration.h>
 #import <WebRTC/RTCIceServer.h>
 #import <WebRTC/RTCSessionDescription.h>
@@ -46,7 +47,7 @@
   }
 
   NSString *sdp = json[@"candidate"];
-  NSLog(@"%@ <- candidate", sdp);
+  RCTLogTrace(@"%@ <- candidate", sdp);
   int sdpMLineIndex = [RCTConvert int:json[@"sdpMLineIndex"]];
   NSString *sdpMid = json[@"sdpMid"];
 
@@ -88,6 +89,9 @@
 + (nonnull RTCConfiguration *)RTCConfiguration:(id)json
 {
   RTCConfiguration *config = [[RTCConfiguration alloc] init];
+
+  // Required for perfect negotiation.
+  config.enableImplicitRollback = YES;
 
   if (!json) {
     return config;
@@ -180,9 +184,6 @@
 
     if (json[@"ordered"]) {
       init.isOrdered = [RCTConvert BOOL:json[@"ordered"]];
-    }
-    if (json[@"maxRetransmitTime"]) {
-      init.maxRetransmitTimeMs = [RCTConvert NSInteger:json[@"maxRetransmitTime"]];
     }
     if (json[@"maxRetransmits"]) {
       init.maxRetransmits = [RCTConvert int:json[@"maxRetransmits"]];
