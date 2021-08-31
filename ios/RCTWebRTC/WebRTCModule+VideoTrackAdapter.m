@@ -2,9 +2,11 @@
 #import <Foundation/Foundation.h>
 #include <libkern/OSAtomic.h>
 #import <objc/runtime.h>
+#import <stdatomic.h>
 
 #import <React/RCTBridge.h>
 #import <React/RCTEventDispatcher.h>
+#import <React/RCTLog.h>
 
 #import <WebRTC/RTCVideoRenderer.h>
 #import <WebRTC/RTCVideoTrack.h>
@@ -35,7 +37,7 @@ static const NSTimeInterval MUTE_DELAY = 1.5;
 
 @implementation TrackMuteDetector {
     BOOL _disposed;
-    volatile int64_t _frameCount;
+    atomic_ullong _frameCount;
     BOOL _muted;
     dispatch_source_t _timer;
 }
@@ -69,13 +71,14 @@ static const NSTimeInterval MUTE_DELAY = 1.5;
 }
 
 - (void)emitMuteEvent:(BOOL)muted {
-    [self.module.bridge.eventDispatcher
-        sendDeviceEventWithName:@"mediaStreamTrackMuteChanged"
-                   body:@{@"peerConnectionId": self.peerConnectionId,
-                          @"streamReactTag": self.streamReactTag,
-                          @"trackId": self.trackId,
-                          @"muted": @(muted)}];
-    NSLog(@"[VideoTrackAdapter] %@ event for %@ %@ %@",
+    [self.module sendEventWithName:kEventMediaStreamTrackMuteChanged
+                              body:@{
+                                @"peerConnectionId": self.peerConnectionId,
+                                @"streamReactTag": self.streamReactTag,
+                                @"trackId": self.trackId,
+                                @"muted": @(muted)
+                              }];
+    RCTLog(@"[VideoTrackAdapter] %@ event for %@ %@ %@",
           muted ? @"Mute" : @"Unmute",
           self.peerConnectionId,
           self.streamReactTag,
@@ -101,26 +104,26 @@ static const NSTimeInterval MUTE_DELAY = 1.5;
         _timer, dispatch_time(DISPATCH_TIME_NOW, INITIAL_MUTE_DELAY * NSEC_PER_SEC),
         MUTE_DELAY * NSEC_PER_SEC, (1ull * NSEC_PER_SEC) / 10);
 
-    __block int64_t lastFrameCount = _frameCount;
+    __block unsigned long long lastFrameCount = _frameCount;
     dispatch_source_set_event_handler(_timer, ^() {
-        if (_disposed) {
+        if (self->_disposed) {
             return;
         }
 
-        BOOL isMuted = lastFrameCount == _frameCount;
-        if (isMuted != _muted) {
-            _muted = isMuted;
+        BOOL isMuted = lastFrameCount == self->_frameCount;
+        if (isMuted != self->_muted) {
+            self->_muted = isMuted;
             [self emitMuteEvent:isMuted];
         }
 
-        lastFrameCount = _frameCount;
+        lastFrameCount = self->_frameCount;
     });
 
     dispatch_resume(_timer);
 }
 
 - (void)renderFrame:(nullable RTCVideoFrame *)frame {
-    OSAtomicIncrement64(&_frameCount);
+    atomic_fetch_add(&_frameCount, 1);
 }
 
 - (void)setSize:(CGSize)size {
@@ -144,7 +147,7 @@ static const NSTimeInterval MUTE_DELAY = 1.5;
 - (void)addVideoTrackAdapter:(NSString*)streamReactId track:(RTCVideoTrack*)track {
     NSString* trackId = track.trackId;
     if ([self.videoTrackAdapters objectForKey:trackId] != nil) {
-        NSLog(@"[VideoTrackAdapter] Adapter already exists for track %@", trackId);
+        RCTLogWarn(@"[VideoTrackAdapter] Adapter already exists for track %@", trackId);
         return;
     }
 
@@ -157,7 +160,7 @@ static const NSTimeInterval MUTE_DELAY = 1.5;
     [track addRenderer:muteDetector];
     [muteDetector start];
 
-    NSLog(@"[VideoTrackAdapter] Adapter created for track %@", trackId);
+    RCTLogTrace(@"[VideoTrackAdapter] Adapter created for track %@", trackId);
 }
 
 - (void)removeVideoTrackAdapter:(RTCVideoTrack*)track {
@@ -165,14 +168,14 @@ static const NSTimeInterval MUTE_DELAY = 1.5;
     TrackMuteDetector* muteDetector
         = [self.videoTrackAdapters objectForKey:trackId];
     if (muteDetector == nil) {
-        NSLog(@"[VideoTrackAdapter] Adapter doesn't exist for track %@", trackId);
+        RCTLogWarn(@"[VideoTrackAdapter] Adapter doesn't exist for track %@", trackId);
         return;
     }
 
     [track removeRenderer:muteDetector];
     [muteDetector dispose];
     [self.videoTrackAdapters removeObjectForKey:trackId];
-    NSLog(@"[VideoTrackAdapter] Adapter removed for track %@", trackId);
+    RCTLogTrace(@"[VideoTrackAdapter] Adapter removed for track %@", trackId);
 }
 
 @end

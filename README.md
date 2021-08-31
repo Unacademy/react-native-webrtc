@@ -4,24 +4,22 @@
 [![npm downloads](https://img.shields.io/npm/dm/react-native-webrtc.svg?maxAge=2592000)](https://img.shields.io/npm/dm/react-native-webrtc.svg?maxAge=2592000)
 
 A WebRTC module for React Native.
-- Support iOS / Android.
+- Support iOS / macOS / Android.
 - Support Video / Audio / Data Channels.
 
 **NOTE** for Expo users: this plugin doesn't work unless you eject.
 
-## Comunity
+## Community
 
 Everyone is welcome to our [Discourse community](https://react-native-webrtc.discourse.group/) to discuss any React Native and WebRTC related topics.
 
 ## WebRTC Revision
 
-| react-native-webrtc | WebRTC Version | arch(ios) | arch(android)  | npm published | note | additional picks |
-| :-------------: | :-------------:| :-----: | :-----: | :-----: | :-----: | :-----: |
-| 1.69.1 | [M69](https://chromium.googlesource.com/external/webrtc/+/branch-heads/69)<br>[commit](https://chromium.googlesource.com/external/webrtc/+/9110a54a60d9e0c69128338fc250319ddb751b5a)<br>(24012)<br>(+16-24348) | x86_64<br>i386<br>armv7<br>arm64 | armeabi-v7a<br>arm64-v8a<br>x86<br>x86_64 | :heavy_check_mark: |  |  |
-| 1.69.0 | [M69](https://chromium.googlesource.com/external/webrtc/+/branch-heads/69)<br>[commit](https://chromium.googlesource.com/external/webrtc/+/9110a54a60d9e0c69128338fc250319ddb751b5a)<br>(24012)<br>(+16-24348) | x86_64<br>i386<br>armv7<br>arm64 | armeabi-v7a<br>x86 | :heavy_check_mark: |  |  |
-| master | [M69](https://chromium.googlesource.com/external/webrtc/+/branch-heads/69)<br>[commit](https://chromium.googlesource.com/external/webrtc/+/9110a54a60d9e0c69128338fc250319ddb751b5a)<br>(24012)<br>(+16-24348) | x86_64<br>i386<br>armv7<br>arm64 | armeabi-v7a<br>x86 | :warning: | test me plz |  |
-
-Please see [wiki page](https://github.com/react-native-webrtc/react-native-webrtc/wiki) about revision history.
+* Currently used revision: [M92](https://github.com/jitsi/webrtc/commit/4f97ba956083bdd402aa6d3f55cc064831f88f50)
+* Supported architectures
+  * Android: armeabi-v7a, arm64-v8a, x86, x86_64
+  * iOS: arm64, x86_64 (for bitcode support, run [this script](https://github.com/react-native-webrtc/react-native-webrtc/blob/master/tools/downloadBitcode.sh))
+  * macOS: x86_64
 
 ## Installation
 
@@ -40,7 +38,8 @@ import {
   RTCView,
   MediaStream,
   MediaStreamTrack,
-  mediaDevices
+  mediaDevices,
+  registerGlobals
 } from 'react-native-webrtc';
 ```
 Anything about using RTCPeerConnection, RTCSessionDescription and RTCIceCandidate is like browser.
@@ -56,20 +55,18 @@ mediaDevices.enumerateDevices().then(sourceInfos => {
   let videoSourceId;
   for (let i = 0; i < sourceInfos.length; i++) {
     const sourceInfo = sourceInfos[i];
-    if(sourceInfo.kind == "videoinput" && sourceInfo.facing == (isFront ? "front" : "back")) {
+    if(sourceInfo.kind == "videoinput" && sourceInfo.facing == (isFront ? "front" : "environment")) {
       videoSourceId = sourceInfo.deviceId;
     }
   }
   mediaDevices.getUserMedia({
     audio: true,
     video: {
-      mandatory: {
-        minWidth: 500, // Provide your own width, height and frame rate here
-        minHeight: 300,
-        minFrameRate: 30
-      },
+      width: 640,
+      height: 480,
+      frameRate: 30,
       facingMode: (isFront ? "user" : "environment"),
-      optional: (videoSourceId ? [{sourceId: videoSourceId}] : [])
+      deviceId: videoSourceId
     }
   })
   .then(stream => {
@@ -114,6 +111,22 @@ Rendering RTCView.
 
 ### Custom APIs
 
+#### registerGlobals()
+
+By calling this method the JavaScript global namespace gets "polluted" with the following additions:
+
+* `navigator.mediaDevices.getUserMedia()`
+* `navigator.mediaDevices.getDisplayMedia()`
+* `navigator.mediaDevices.enumerateDevices()`
+* `window.RTCPeerConnection`
+* `window.RTCIceCandidate`
+* `window.RTCSessionDescription`
+* `window.MediaStream`
+* `window.MediaStreamTrack`
+
+This is useful to make existing WebRTC JavaScript libraries (that expect those globals to exist) work with react-native-webrtc.
+
+
 #### MediaStreamTrack.prototype._switchCamera()
 
 This function allows to switch the front / back cameras in a video track
@@ -127,16 +140,12 @@ it back to `true` will re-enable the camera.
 
 ## Related projects
 
-### react-native-incall-manager
+The [react-native-webrtc](https://github.com/react-native-webrtc) organization provides a number of packages which are useful when developing Real Time Communications applications.
 
-Use [react-native-incall-manager](https://github.com/zxcpoiu/react-native-incall-manager) to keep screen on, mute microphone, etc.
+The [react-native-webrtc-web-shim](https://github.com/react-native-webrtc/react-native-webrtc-web-shim) project provides a shim for react-native-web support, allowing you to use [(almost)](https://github.com/react-native-webrtc/react-native-webrtc-web-shim/tree/main#setup) the same code in react-native-web as in react-native.
 
-### react-native-callkeep
+## Acknowledgements
 
-Use [react-native-callkeep](https://github.com/wazo-pbx/react-native-callkeep) to use callkit on iOS or connection service on Android to have native dialer with your webrtc application.
+Thanks to all [contributors](https://github.com/react-native-webrtc/react-native-webrtc/graphs/contributors) for helping with the project!
 
-## Sponsorship
-This repository doesn't have a plan to get sponsorship.(This can be discussed afterwards by collaborators). If you would like to pay bounty to fix some bugs or get some features, be free to open a issue that adds `[BOUNTY]` category in title. Add other bounty website link like [this](https://www.bountysource.com) will be better.
-
-## Creator
-This repository is originally created by [Wan Huang Yang](https://github.com/oney/).
+Special thanks to [Wan Huang Yang](https://github.com/oney/) for creating the first version of this package.

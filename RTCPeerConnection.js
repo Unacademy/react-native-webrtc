@@ -1,8 +1,7 @@
 'use strict';
 
 import EventTarget from 'event-target-shim';
-import {DeviceEventEmitter, NativeModules} from 'react-native';
-import * as RTCUtil from './RTCUtil';
+import { NativeModules } from 'react-native';
 
 import MediaStream from './MediaStream';
 import MediaStreamEvent from './MediaStreamEvent';
@@ -14,8 +13,10 @@ import RTCSessionDescription from './RTCSessionDescription';
 import RTCIceCandidate from './RTCIceCandidate';
 import RTCIceCandidateEvent from './RTCIceCandidateEvent';
 import RTCEvent from './RTCEvent';
+import * as RTCUtil from './RTCUtil';
+import EventEmitter from './EventEmitter';
 
-const {WebRTCModule} = NativeModules;
+const { WebRTCModule } = NativeModules;
 
 type RTCSignalingState =
   'stable' |
@@ -30,6 +31,14 @@ type RTCIceGatheringState =
   'gathering' |
   'complete';
 
+type RTCPeerConnectionState =
+  'new' |
+  'connecting' |
+  'connected' |
+  'disconnected' |
+  'failed' |
+  'closed';
+
 type RTCIceConnectionState =
   'new' |
   'checking' |
@@ -39,16 +48,13 @@ type RTCIceConnectionState =
   'disconnected' |
   'closed';
 
-/**
- * The default constraints of RTCPeerConnection's createOffer() and
- * createAnswer().
- */
-const DEFAULT_SDP_CONSTRAINTS = {
-  mandatory: {
-    OfferToReceiveAudio: true,
-    OfferToReceiveVideo: true,
-  },
-  optional: [],
+type RTCDataChannelInit = {
+    ordered?: boolean;
+    maxPacketLifeTime?: number;
+    maxRetransmits?: number;
+    protocol?: string;
+    negotiated?: boolean;
+    id?: number;
 };
 
 const PEER_CONNECTION_EVENTS = [
@@ -74,6 +80,7 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
 
   signalingState: RTCSignalingState = 'stable';
   iceGatheringState: RTCIceGatheringState = 'new';
+  connectionState: RTCPeerConnectionState = 'new';
   iceConnectionState: RTCIceConnectionState = 'new';
 
   onconnectionstatechange: ?Function;
@@ -92,11 +99,6 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
   _remoteStreams: Array<MediaStream> = [];
   _subscriptions: Array<any>;
 
-  /**
-   * The RTCDataChannel.id allocator of this RTCPeerConnection.
-   */
-  _dataChannelIds: Set = new Set();
-
   constructor(configuration) {
     super();
     this._peerConnectionId = nextPeerConnectionId++;
@@ -105,26 +107,31 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
   }
 
   addStream(stream: MediaStream) {
-    WebRTCModule.peerConnectionAddStream(stream.reactTag, this._peerConnectionId);
-    this._localStreams.push(stream);
+      const index = this._localStreams.indexOf(stream);
+      if (index !== -1) {
+          return;
+      }
+      WebRTCModule.peerConnectionAddStream(stream._reactTag, this._peerConnectionId);
+      this._localStreams.push(stream);
   }
 
   removeStream(stream: MediaStream) {
-    WebRTCModule.peerConnectionRemoveStream(stream.reactTag, this._peerConnectionId);
-    let index = this._localStreams.indexOf(stream);
-    if (index !== -1) {
+      const index = this._localStreams.indexOf(stream);
+      if (index === -1) {
+          return;
+      }
       this._localStreams.splice(index, 1);
-    }
+      WebRTCModule.peerConnectionRemoveStream(stream._reactTag, this._peerConnectionId);
   }
 
   createOffer(options) {
     return new Promise((resolve, reject) => {
       WebRTCModule.peerConnectionCreateOffer(
         this._peerConnectionId,
-        RTCUtil.mergeMediaConstraints(options, DEFAULT_SDP_CONSTRAINTS),
+        RTCUtil.normalizeOfferAnswerOptions(options),
         (successful, data) => {
           if (successful) {
-            resolve(new RTCSessionDescription(data));
+            resolve(data);
           } else {
             reject(data); // TODO: convert to NavigatorUserMediaError
           }
@@ -132,14 +139,14 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
     });
   }
 
-  createAnswer(options) {
+  createAnswer(options = {}) {
     return new Promise((resolve, reject) => {
       WebRTCModule.peerConnectionCreateAnswer(
         this._peerConnectionId,
-        RTCUtil.mergeMediaConstraints(options, DEFAULT_SDP_CONSTRAINTS),
+        RTCUtil.normalizeOfferAnswerOptions(options),
         (successful, data) => {
           if (successful) {
-            resolve(new RTCSessionDescription(data));
+            resolve(data);
           } else {
             reject(data);
           }
@@ -151,20 +158,12 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
     WebRTCModule.peerConnectionSetConfiguration(configuration, this._peerConnectionId);
   }
 
-  setLocalDescription(sessionDescription: RTCSessionDescription) {
-    return new Promise((resolve, reject) => {
-      WebRTCModule.peerConnectionSetLocalDescription(
-        sessionDescription.toJSON ? sessionDescription.toJSON() : sessionDescription,
-        this._peerConnectionId,
-        (successful, data) => {
-          if (successful) {
-            this.localDescription = sessionDescription;
-            resolve();
-          } else {
-            reject(data);
-          }
-      });
-    });
+  async setLocalDescription(sessionDescription: ?RTCSessionDescription) {
+    const desc = sessionDescription ?
+      (sessionDescription.toJSON ? sessionDescription.toJSON() : sessionDescription) : null;
+    const newSdp = await WebRTCModule.peerConnectionSetLocalDescription(this._peerConnectionId, desc);
+
+    this.localDescription = new RTCSessionDescription(newSdp);
   }
 
   setRemoteDescription(sessionDescription: RTCSessionDescription) {
@@ -174,7 +173,7 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
         this._peerConnectionId,
         (successful, data) => {
           if (successful) {
-            this.remoteDescription = sessionDescription;
+            this.remoteDescription = new RTCSessionDescription(data);
             resolve();
           } else {
             reject(data);
@@ -183,50 +182,36 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
     });
   }
 
-  addIceCandidate(candidate) {
-    return new Promise((resolve, reject) => {
-      WebRTCModule.peerConnectionAddICECandidate(
-        candidate.toJSON ? candidate.toJSON() : candidate,
+  async addIceCandidate(candidate) {
+    if (!candidate || !candidate.candidate) {
+      // XXX end-of cantidates is not implemented: https://bugs.chromium.org/p/webrtc/issues/detail?id=9218
+      return;
+    }
+
+    const newSdp = await WebRTCModule.peerConnectionAddICECandidate(
         this._peerConnectionId,
-        (successful) => {
-          if (successful) {
-            resolve()
-          } else {
-            // XXX: This should be OperationError
-            reject(new Error('Failed to add ICE candidate'));
-          }
-      });
-    });
+        candidate.toJSON ? candidate.toJSON() : candidate
+    );
+
+    this.remoteDescription = new RTCSessionDescription(newSdp);
   }
 
-  getStats(track) {
-    // NOTE: This returns a Promise but the format of the results is still
-    // the "legacy" one. The native side (in Oobj-C) doesn't yet support the
-    // new format: https://bugs.chromium.org/p/webrtc/issues/detail?id=6872
-    return new Promise((resolve, reject) => {
-      WebRTCModule.peerConnectionGetStats(
-        (track && track.id) || '',
-        this._peerConnectionId,
-        (success, data) => {
-          if (success) {
-            // On both Android and iOS it is faster to construct a single
-            // JSON string representing the array of StatsReports and have it
-            // pass through the React Native bridge rather than the array of
-            // StatsReports. While the implementations do try to be faster in
-            // general, the stress is on being faster to pass through the React
-            // Native bridge which is a bottleneck that tends to be visible in
-            // the UI when there is congestion involving UI-related passing.
-            try {
-              const stats = JSON.parse(data);
-              resolve(stats);
-            } catch (e) {
-              reject(e);
-            }
-          } else {
-            reject(new Error(data));
-          }
+  getStats() {
+    return WebRTCModule.peerConnectionGetStats(this._peerConnectionId)
+        .then( data =>  {
+           /* On both Android and iOS it is faster to construct a single
+            JSON string representing the Map of StatsReports and have it
+            pass through the React Native bridge rather than the Map of
+            StatsReports. While the implementations do try to be faster in
+            general, the stress is on being faster to pass through the React
+            Native bridge which is a bottleneck that tends to be visible in
+            the UI when there is congestion involving UI-related passing.
+
+            TODO Implement the logic for filtering the stats based on 
+            the sender/receiver
+            */
+            return new Map(JSON.parse(data));
         });
-    });
   }
 
   getLocalStreams() {
@@ -241,10 +226,14 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
     WebRTCModule.peerConnectionClose(this._peerConnectionId);
   }
 
+  restartIce() {
+    WebRTCModule.peerConnectionRestartIce(this._peerConnectionId);
+  }
+
   _getTrack(streamReactTag, trackId): MediaStreamTrack {
     const stream
       = this._remoteStreams.find(
-          stream => stream.reactTag === streamReactTag);
+          stream => stream._reactTag === streamReactTag);
 
     return stream && stream._tracks.find(track => track.id === trackId);
   }
@@ -256,13 +245,13 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
 
   _registerEvents(): void {
     this._subscriptions = [
-      DeviceEventEmitter.addListener('peerConnectionOnRenegotiationNeeded', ev => {
+      EventEmitter.addListener('peerConnectionOnRenegotiationNeeded', ev => {
         if (ev.id !== this._peerConnectionId) {
           return;
         }
         this.dispatchEvent(new RTCEvent('negotiationneeded'));
       }),
-      DeviceEventEmitter.addListener('peerConnectionIceConnectionChanged', ev => {
+      EventEmitter.addListener('peerConnectionIceConnectionChanged', ev => {
         if (ev.id !== this._peerConnectionId) {
           return;
         }
@@ -273,39 +262,48 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
           this._unregisterEvents();
         }
       }),
-      DeviceEventEmitter.addListener('peerConnectionSignalingStateChanged', ev => {
+      EventEmitter.addListener('peerConnectionStateChanged', ev => {
+        if (ev.id !== this._peerConnectionId) {
+          return;
+        }
+        this.connectionState = ev.connectionState;
+        this.dispatchEvent(new RTCEvent('connectionstatechange'));
+        if (ev.connectionState === 'closed') {
+          // This PeerConnection is done, clean up event handlers.
+          this._unregisterEvents();
+        }
+      }),
+      EventEmitter.addListener('peerConnectionSignalingStateChanged', ev => {
         if (ev.id !== this._peerConnectionId) {
           return;
         }
         this.signalingState = ev.signalingState;
         this.dispatchEvent(new RTCEvent('signalingstatechange'));
       }),
-      DeviceEventEmitter.addListener('peerConnectionAddedStream', ev => {
+      EventEmitter.addListener('peerConnectionAddedStream', ev => {
         if (ev.id !== this._peerConnectionId) {
           return;
         }
-        const stream = new MediaStream(ev.streamId, ev.streamReactTag);
-        const tracks = ev.tracks;
-        for (let i = 0; i < tracks.length; i++) {
-          stream.addTrack(new MediaStreamTrack(tracks[i]));
-        }
+        const stream = new MediaStream(ev);
         this._remoteStreams.push(stream);
+        this.remoteDescription = new RTCSessionDescription(ev.sdp);
         this.dispatchEvent(new MediaStreamEvent('addstream', {stream}));
       }),
-      DeviceEventEmitter.addListener('peerConnectionRemovedStream', ev => {
+      EventEmitter.addListener('peerConnectionRemovedStream', ev => {
         if (ev.id !== this._peerConnectionId) {
           return;
         }
-        const stream = this._remoteStreams.find(s => s.reactTag === ev.streamId);
+        const stream = this._remoteStreams.find(s => s._reactTag === ev.streamId);
         if (stream) {
           const index = this._remoteStreams.indexOf(stream);
-          if (index > -1) {
+          if (index !== -1) {
             this._remoteStreams.splice(index, 1);
           }
         }
+        this.remoteDescription = new RTCSessionDescription(ev.sdp);
         this.dispatchEvent(new MediaStreamEvent('removestream', {stream}));
       }),
-      DeviceEventEmitter.addListener('mediaStreamTrackMuteChanged', ev => {
+      EventEmitter.addListener('mediaStreamTrackMuteChanged', ev => {
         if (ev.peerConnectionId !== this._peerConnectionId) {
           return;
         }
@@ -316,50 +314,33 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
           track.dispatchEvent(new MediaStreamTrackEvent(eventName, {track}));
         }
       }),
-      DeviceEventEmitter.addListener('peerConnectionGotICECandidate', ev => {
+      EventEmitter.addListener('peerConnectionGotICECandidate', ev => {
         if (ev.id !== this._peerConnectionId) {
           return;
         }
+        this.localDescription = new RTCSessionDescription(ev.sdp);
         const candidate = new RTCIceCandidate(ev.candidate);
         const event = new RTCIceCandidateEvent('icecandidate', {candidate});
         this.dispatchEvent(event);
       }),
-      DeviceEventEmitter.addListener('peerConnectionIceGatheringChanged', ev => {
+      EventEmitter.addListener('peerConnectionIceGatheringChanged', ev => {
         if (ev.id !== this._peerConnectionId) {
           return;
         }
         this.iceGatheringState = ev.iceGatheringState;
 
         if (this.iceGatheringState === 'complete') {
+          this.localDescription = new RTCSessionDescription(ev.sdp);
           this.dispatchEvent(new RTCIceCandidateEvent('icecandidate', null));
         }
 
         this.dispatchEvent(new RTCEvent('icegatheringstatechange'));
       }),
-      DeviceEventEmitter.addListener('peerConnectionDidOpenDataChannel', ev => {
+      EventEmitter.addListener('peerConnectionDidOpenDataChannel', ev => {
         if (ev.id !== this._peerConnectionId) {
           return;
         }
-        const evDataChannel = ev.dataChannel;
-        const id = evDataChannel.id;
-        // XXX RTP data channels are not defined by the WebRTC standard, have
-        // been deprecated in Chromium, and Google have decided (in 2015) to no
-        // longer support them (in the face of multiple reported issues of
-        // breakages).
-        if (typeof id !== 'number' || id === -1) {
-          return;
-        }
-        const channel
-          = new RTCDataChannel(
-              this._peerConnectionId,
-              evDataChannel.label,
-              evDataChannel);
-        // XXX webrtc::PeerConnection checked that id was not in use in its own
-        // SID allocator before it invoked us. Additionally, its own SID
-        // allocator is the authority on ResourceInUse. Consequently, it is
-        // (pretty) safe to update our RTCDataChannel.id allocator without
-        // checking for ResourceInUse.
-        this._dataChannelIds.add(id);
+        const channel = new RTCDataChannel(ev.dataChannel);
         this.dispatchEvent(new RTCDataChannelEvent('datachannel', {channel}));
       })
     ];
@@ -376,36 +357,23 @@ export default class RTCPeerConnection extends EventTarget(PEER_CONNECTION_EVENT
    * values with which to initialize corresponding attributes of the new
    * instance such as id
    */
-  createDataChannel(label: string, dataChannelDict?: ?RTCDataChannelInit) {
-    let id;
-    const dataChannelIds = this._dataChannelIds;
+  createDataChannel(label: string, dataChannelDict: ?RTCDataChannelInit) {
     if (dataChannelDict && 'id' in dataChannelDict) {
-      id = dataChannelDict.id;
+      const id = dataChannelDict.id;
       if (typeof id !== 'number') {
         throw new TypeError('DataChannel id must be a number: ' + id);
       }
-      if (dataChannelIds.has(id)) {
-        throw new ResourceInUse('DataChannel id already in use: ' + id);
-      }
-    } else {
-      // Allocate a new id.
-      // TODO Remembering the last used/allocated id and then incrementing it to
-      // generate the next id to use will surely be faster. However, I want to
-      // reuse ids (in the future) as the RTCDataChannel.id space is limited to
-      // unsigned short by the standard:
-      // https://www.w3.org/TR/webrtc/#dom-datachannel-id. Additionally, 65535
-      // is reserved due to SCTP INIT and INIT-ACK chunks only allowing a
-      // maximum of 65535 streams to be negotiated (as defined by the WebRTC
-      // Data Channel Establishment Protocol).
-      for (id = 0; id < 65535 && dataChannelIds.has(id); ++id);
-      // TODO Throw an error if no unused id is available.
-      dataChannelDict = Object.assign({id}, dataChannelDict);
     }
-    WebRTCModule.createDataChannel(
+
+    const channelInfo = WebRTCModule.createDataChannel(
         this._peerConnectionId,
         label,
         dataChannelDict);
-    dataChannelIds.add(id);
-    return new RTCDataChannel(this._peerConnectionId, label, dataChannelDict);
+
+    if (channelInfo === null) {
+      throw new TypeError('Failed to create new DataChannel');
+    }
+
+    return new RTCDataChannel(channelInfo);
   }
 }
