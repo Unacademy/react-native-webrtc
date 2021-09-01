@@ -64,7 +64,18 @@ class MediaStreamTrack extends EventTarget(MEDIA_STREAM_TRACK_EVENTS) {
     }
     WebRTCModule.mediaStreamTrackSetEnabled(this.id, !this._enabled);
     this._enabled = !this._enabled;
-    this.muted = !this._enabled;
+    this.muted = !this.muted;
+  }
+
+  setEnabledForced(enabled) {
+    // when new stream is received, internally all the tracks of older stream are disabled
+    // this._enabled and MediaStreamTrack.enabled are not in sync and hence setting .enabled fails
+    // due to the `if` check in the above function.
+    if(typeof enabled === 'boolean') {
+      WebRTCModule.mediaStreamTrackSetEnabled(this.id, enabled);
+      this._enabled = enabled;
+      this.muted = !enabled;
+    }
   }
 
   stop() {
