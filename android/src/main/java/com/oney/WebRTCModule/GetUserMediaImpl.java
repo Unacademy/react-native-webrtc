@@ -10,6 +10,7 @@ import android.util.Log;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.BaseActivityEventListener;
 import com.facebook.react.bridge.Callback;
+import com.facebook.react.bridge.JavaOnlyMap;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReadableArray;
@@ -282,12 +283,18 @@ class GetUserMediaImpl {
     }
 
     private void createScreenStream() {
-        VideoTrack track = createScreenTrack();
+        // send audio from mic everytime, regardless of constraints passed to getDisplayMedia
+        JavaOnlyMap constraints = new JavaOnlyMap();
+        JavaOnlyMap audioConstraints = new JavaOnlyMap();
+        constraints.putMap("audio", audioConstraints);
 
-        if (track == null) {
+        AudioTrack audioTrack = createAudioTrack(constraints);
+        VideoTrack videoTrack = createScreenTrack();
+
+        if (videoTrack == null) {
             displayMediaPromise.reject(new RuntimeException("ScreenTrack is null."));
         } else {
-            createStream(new MediaStreamTrack[]{track}, (streamId, tracksInfo) -> {
+            createStream(new MediaStreamTrack[]{audioTrack, videoTrack}, (streamId, tracksInfo) -> {
                 WritableMap data = Arguments.createMap();
 
                 data.putString("streamId", streamId);
