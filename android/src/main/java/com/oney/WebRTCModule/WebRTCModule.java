@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.webrtc.*;
+import org.webrtc.audio.AudioDeviceModule;
+import org.webrtc.audio.JavaAudioDeviceModule;
+import org.webrtc.voiceengine.WebRtcAudioUtils;
 
 @ReactModule(name = "WebRTCModule")
 public class WebRTCModule extends ReactContextBaseJavaModule {
@@ -37,6 +40,9 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
      * in order to reduce complexity and to (somewhat) separate concerns.
      */
     private GetUserMediaImpl getUserMediaImpl;
+
+    private final Boolean USE_HARDWARE_ACOUSTIC_ECHO_CANCELER = false;
+    private final Boolean USE_HARDWARE_NOISE_SUPPRESSOR = false;
 
     public WebRTCModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -76,8 +82,29 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
             decoderFactory = new SoftwareVideoDecoderFactory();
         }
 
+
+
+        AudioDeviceModule adm = JavaAudioDeviceModule.builder(reactContext)
+                .setUseHardwareAcousticEchoCanceler(this.USE_HARDWARE_ACOUSTIC_ECHO_CANCELER)
+                .setUseHardwareNoiseSuppressor(this.USE_HARDWARE_NOISE_SUPPRESSOR)
+                .createAudioDeviceModule();
+
+        Log.d("RN_DEBUG", "BuildIn Echo Canceller - " + this.USE_HARDWARE_ACOUSTIC_ECHO_CANCELER);
+        Log.d("RN_DEBUG", "BuildIn Noise Suppressor - " + this.USE_HARDWARE_NOISE_SUPPRESSOR);
+
+        if(!JavaAudioDeviceModule.isBuiltInAcousticEchoCancelerSupported() || !this.USE_HARDWARE_ACOUSTIC_ECHO_CANCELER) {
+            Log.d("RN_DEBUG", "Enabling webrtc echo canceller");
+            WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
+        }
+
+        if(!JavaAudioDeviceModule.isBuiltInNoiseSuppressorSupported() || !this.USE_HARDWARE_NOISE_SUPPRESSOR) {
+            Log.d("RN_DEBUG", "Enabling webrtc noise suppressor");
+            WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
+        }
+
         mFactory
             = PeerConnectionFactory.builder()
+                .setAudioDeviceModule(adm)
                 .setVideoEncoderFactory(encoderFactory)
                 .setVideoDecoderFactory(decoderFactory)
                 .createPeerConnectionFactory();
