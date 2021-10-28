@@ -89,16 +89,11 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
                 .setUseHardwareNoiseSuppressor(this.USE_HARDWARE_NOISE_SUPPRESSOR)
                 .createAudioDeviceModule();
 
-        Log.d("RN_DEBUG", "BuildIn Echo Canceller - " + this.USE_HARDWARE_ACOUSTIC_ECHO_CANCELER);
-        Log.d("RN_DEBUG", "BuildIn Noise Suppressor - " + this.USE_HARDWARE_NOISE_SUPPRESSOR);
-
         if(!JavaAudioDeviceModule.isBuiltInAcousticEchoCancelerSupported() || !this.USE_HARDWARE_ACOUSTIC_ECHO_CANCELER) {
-            Log.d("RN_DEBUG", "Enabling webrtc echo canceller");
             WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
         }
 
         if(!JavaAudioDeviceModule.isBuiltInNoiseSuppressorSupported() || !this.USE_HARDWARE_NOISE_SUPPRESSOR) {
-            Log.d("RN_DEBUG", "Enabling webrtc noise suppressor");
             WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
         }
 
