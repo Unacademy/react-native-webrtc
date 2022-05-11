@@ -293,6 +293,7 @@ class PeerConnectionObserver implements PeerConnection.Observer {
         candidateParams.putInt("sdpMLineIndex", candidate.sdpMLineIndex);
         candidateParams.putString("sdpMid", candidate.sdpMid);
         candidateParams.putString("candidate", candidate.sdp);
+        candidateParams.putString("serverUrl", candidate.serverUrl);
         params.putMap("candidate", candidateParams);
 
         webRTCModule.sendEvent("peerConnectionGotICECandidate", params);
