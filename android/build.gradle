@@ -27,10 +27,10 @@ android {
 
     flavorDimensions "react-native-webrtc"
     productFlavors {
-        unacademy {
+        bugsnag {
             dimension "react-native-webrtc"
         }
-        external {
+        vanilla {
             dimension "react-native-webrtc"
         }
     }
@@ -38,6 +38,6 @@ android {
 
 dependencies {
     implementation 'com.facebook.react:react-native:+'
-    unacademyApi 'com.bugsnag:bugsnag-android:5.2.2'
+    bugsnagApi 'com.bugsnag:bugsnag-android:5.2.2'
     api fileTree(dir: 'libs', include: ['*.jar'])
 }
