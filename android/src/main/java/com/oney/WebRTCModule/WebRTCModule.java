@@ -91,6 +91,7 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
 
         if(!JavaAudioDeviceModule.isBuiltInAcousticEchoCancelerSupported() || !this.USE_HARDWARE_ACOUSTIC_ECHO_CANCELER) {
             WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
+            WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true);
         }
 
         if(!JavaAudioDeviceModule.isBuiltInNoiseSuppressorSupported() || !this.USE_HARDWARE_NOISE_SUPPRESSOR) {
