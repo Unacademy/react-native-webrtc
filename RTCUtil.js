@@ -1,5 +1,9 @@
 'use strict';
 
+import { NativeModules } from 'react-native';
+
+const { WebRTCModule } = NativeModules;
+
 /**
  * Internal util for deep clone object. Object.assign() only does a shallow copy
  *
@@ -32,4 +36,16 @@ export function mergeMediaConstraints(custom, def) {
     }
   }
   return constraints;
+}
+
+export function enableSoftwareAEC() {
+  if(WebRTCModule?.enableSoftwareAEC) {
+    WebRTCModule?.enableSoftwareAE()
+  }
+}
+
+export function disableSoftwareAEC() {
+  if(WebRTCModule?.disableSoftwareAEC) {
+    WebRTCModule?.disableSoftwareAEC()
+  }
 }

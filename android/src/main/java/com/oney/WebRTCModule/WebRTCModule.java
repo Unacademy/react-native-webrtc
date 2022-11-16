@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.webrtc.*;
+import org.webrtc.audio.AudioDeviceModule;
+import org.webrtc.audio.JavaAudioDeviceModule;
+import org.webrtc.voiceengine.WebRtcAudioUtils;
 
 @ReactModule(name = "WebRTCModule")
 public class WebRTCModule extends ReactContextBaseJavaModule {
@@ -31,6 +34,8 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
     PeerConnectionFactory mFactory;
     private final SparseArray<PeerConnectionObserver> mPeerConnectionObservers;
     final Map<String, MediaStream> localStreams;
+
+    private boolean enableSoftwareBasedNoiseCancellation = false;
 
     /**
      * The implementation of {@code getUserMedia} extracted into a separate file
@@ -77,10 +82,24 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
         }
 
         mFactory
-            = PeerConnectionFactory.builder()
+                = PeerConnectionFactory.builder()
                 .setVideoEncoderFactory(encoderFactory)
                 .setVideoDecoderFactory(decoderFactory)
                 .createPeerConnectionFactory();
+
+        if(enableSoftwareBasedNoiseCancellation) {
+            AudioDeviceModule adm = JavaAudioDeviceModule.builder(reactContext)
+                    .setUseHardwareAcousticEchoCanceler(false)
+                    .setUseHardwareNoiseSuppressor(false)
+                    .createAudioDeviceModule();
+
+            mFactory
+                    = PeerConnectionFactory.builder()
+                    .setAudioDeviceModule(adm)
+                    .setVideoEncoderFactory(encoderFactory)
+                    .setVideoDecoderFactory(decoderFactory)
+                    .createPeerConnectionFactory();
+        }
 
         if (eglContext != null) {
             mFactory.setVideoHwAccelerationOptions(eglContext, eglContext);
@@ -345,6 +364,22 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
         }
 
         return conf;
+    }
+
+    @ReactMethod
+    public void enableSoftwareAEC() {
+        enableSoftwareBasedNoiseCancellation = true;
+        WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true);
+        WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
+        WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
+    }
+
+    @ReactMethod
+    public void disableSoftwareAEC() {
+        enableSoftwareBasedNoiseCancellation = false;
+        WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(false);
+        WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(false);
+        WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(false);
     }
 
     @ReactMethod
