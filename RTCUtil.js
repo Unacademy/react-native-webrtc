@@ -40,7 +40,7 @@ export function mergeMediaConstraints(custom, def) {
 
 export function enableSoftwareAEC() {
   if(WebRTCModule?.enableSoftwareAEC) {
-    WebRTCModule?.enableSoftwareAE()
+    WebRTCModule?.enableSoftwareAEC()
   }
 }
 
