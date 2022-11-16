@@ -32,6 +32,8 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
     static final String TAG = WebRTCModule.class.getCanonicalName();
 
     PeerConnectionFactory mFactory;
+    PeerConnectionFactory mFactory1;
+
     private final SparseArray<PeerConnectionObserver> mPeerConnectionObservers;
     final Map<String, MediaStream> localStreams;
 
@@ -87,22 +89,21 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
                 .setVideoDecoderFactory(decoderFactory)
                 .createPeerConnectionFactory();
 
-        if(enableSoftwareBasedNoiseCancellation) {
-            AudioDeviceModule adm = JavaAudioDeviceModule.builder(reactContext)
-                    .setUseHardwareAcousticEchoCanceler(false)
-                    .setUseHardwareNoiseSuppressor(false)
-                    .createAudioDeviceModule();
+        AudioDeviceModule adm = JavaAudioDeviceModule.builder(reactContext)
+                .setUseHardwareAcousticEchoCanceler(false)
+                .setUseHardwareNoiseSuppressor(false)
+                .createAudioDeviceModule();
 
-            mFactory
-                    = PeerConnectionFactory.builder()
-                    .setAudioDeviceModule(adm)
-                    .setVideoEncoderFactory(encoderFactory)
-                    .setVideoDecoderFactory(decoderFactory)
-                    .createPeerConnectionFactory();
-        }
+        mFactory1
+                = PeerConnectionFactory.builder()
+                .setAudioDeviceModule(adm)
+                .setVideoEncoderFactory(encoderFactory)
+                .setVideoDecoderFactory(decoderFactory)
+                .createPeerConnectionFactory();
 
         if (eglContext != null) {
             mFactory.setVideoHwAccelerationOptions(eglContext, eglContext);
+            mFactory1.setVideoHwAccelerationOptions(eglContext, eglContext);
         }
 
         getUserMediaImpl = new GetUserMediaImpl(this, reactContext);
@@ -395,8 +396,14 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
             PeerConnection.RTCConfiguration configuration,
             int id) {
         PeerConnectionObserver observer = new PeerConnectionObserver(this, id);
-        PeerConnection peerConnection
-            = mFactory.createPeerConnection(configuration, observer);
+
+        PeerConnection peerConnection;
+        if(enableSoftwareBasedNoiseCancellation) {
+            peerConnection = mFactory1.createPeerConnection(configuration, observer);
+        } else {
+            peerConnection = mFactory.createPeerConnection(configuration, observer);
+        }
+
 
         observer.setPeerConnection(peerConnection);
         mPeerConnectionObservers.put(id, observer);
