@@ -23,12 +23,18 @@ import java.util.List;
 import java.util.Map;
 
 import org.webrtc.*;
+import org.webrtc.audio.AudioDeviceModule;
+import org.webrtc.audio.JavaAudioDeviceModule;
+import org.webrtc.voiceengine.WebRtcAudioUtils;
 
 @ReactModule(name = "WebRTCModule")
 public class WebRTCModule extends ReactContextBaseJavaModule {
     static final String TAG = WebRTCModule.class.getCanonicalName();
 
     PeerConnectionFactory mFactory;
+    // PeerConnections created using mFactory1 have hardware AEC turned off
+    PeerConnectionFactory mFactory1;
+
     private final SparseArray<PeerConnectionObserver> mPeerConnectionObservers;
     final Map<String, MediaStream> localStreams;
 
@@ -37,6 +43,9 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
      * in order to reduce complexity and to (somewhat) separate concerns.
      */
     private GetUserMediaImpl getUserMediaImpl;
+
+    private final Boolean USE_HARDWARE_ACOUSTIC_ECHO_CANCELER = false;
+    private final Boolean USE_HARDWARE_NOISE_SUPPRESSOR = false;
 
     public WebRTCModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -76,14 +85,29 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
             decoderFactory = new SoftwareVideoDecoderFactory();
         }
 
+
+
+        AudioDeviceModule customAdm = JavaAudioDeviceModule.builder(reactContext)
+                .setUseHardwareAcousticEchoCanceler(false)
+                .setUseHardwareNoiseSuppressor(false)
+                .createAudioDeviceModule();
+
         mFactory
             = PeerConnectionFactory.builder()
                 .setVideoEncoderFactory(encoderFactory)
                 .setVideoDecoderFactory(decoderFactory)
                 .createPeerConnectionFactory();
 
+        mFactory1
+                = PeerConnectionFactory.builder()
+                .setAudioDeviceModule(customAdm)
+                .setVideoEncoderFactory(encoderFactory)
+                .setVideoDecoderFactory(decoderFactory)
+                .createPeerConnectionFactory();
+
         if (eglContext != null) {
             mFactory.setVideoHwAccelerationOptions(eglContext, eglContext);
+            mFactory1.setVideoHwAccelerationOptions(eglContext, eglContext);
         }
 
         getUserMediaImpl = new GetUserMediaImpl(this, reactContext);
@@ -352,16 +376,36 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
         PeerConnection.RTCConfiguration rtcConfiguration
             = parseRTCConfiguration(configuration);
 
+        boolean enableSoftwareEchoCancellation = false;
+
+        if(
+            configuration.hasKey("enableSoftwareEchoCancellation") &&
+            configuration.getBoolean("enableSoftwareEchoCancellation")
+        ) {
+            enableSoftwareEchoCancellation = true;
+            WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
+            WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true);
+            WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
+        }
+
+        boolean finalEnableSoftwareEchoCancellation = enableSoftwareEchoCancellation;
         ThreadUtils.runOnExecutor(() ->
-            peerConnectionInitAsync(rtcConfiguration, id));
+            peerConnectionInitAsync(rtcConfiguration, id, finalEnableSoftwareEchoCancellation));
     }
 
     private void peerConnectionInitAsync(
             PeerConnection.RTCConfiguration configuration,
-            int id) {
+            int id,
+            boolean enableSoftwareEchoCancellation
+    ) {
         PeerConnectionObserver observer = new PeerConnectionObserver(this, id);
+
         PeerConnection peerConnection
             = mFactory.createPeerConnection(configuration, observer);
+
+        if(enableSoftwareEchoCancellation) {
+            peerConnection = mFactory1.createPeerConnection(configuration, observer);
+        }
 
         observer.setPeerConnection(peerConnection);
         mPeerConnectionObservers.put(id, observer);
