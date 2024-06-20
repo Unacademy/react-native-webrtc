@@ -364,6 +364,16 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
             conf.presumeWritableWhenFullyRelayed = v;
         }
 
+        // disable ipv6 by default
+        if (map.hasKey("disableIpv6") && map.getType("disableIpv6") == ReadableType.Boolean) {
+            final boolean disableIpv6 = map.getBoolean("disableIpv6");
+            conf.disableIpv6 = disableIpv6;
+            conf.disableIPv6OnWifi = disableIpv6;
+        } else {
+            conf.disableIpv6 = true;
+            conf.disableIPv6OnWifi = true;
+        }
+
         return conf;
     }
 
