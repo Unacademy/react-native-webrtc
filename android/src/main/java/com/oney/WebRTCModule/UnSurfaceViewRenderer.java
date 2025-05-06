@@ -14,6 +14,7 @@ import android.view.SurfaceHolder.Callback;
 import java.util.concurrent.CountDownLatch;
 
 import org.webrtc.EglBase;
+import org.webrtc.EglError;
 import org.webrtc.EglRenderer;
 import org.webrtc.EglRenderer.FrameListener;
 import org.webrtc.GlRectDrawer;
@@ -43,9 +44,9 @@ public class UnSurfaceViewRenderer extends SurfaceView implements Callback, Vide
     private int surfaceWidth;
     private int surfaceHeight;
 
-    public UnSurfaceViewRenderer(Context context) {
+    public UnSurfaceViewRenderer(Context context, EglError eglError) {
         super(context);
-        this.eglRenderer = new EglRenderer(this.resourceName);
+        this.eglRenderer = new EglRenderer(this.resourceName, eglError);
         this.getHolder().addCallback(this);
        // this.setZOrderMediaOverlay(true);
      //   this.getHolder().setFormat(PixelFormat.TRANSPARENT);

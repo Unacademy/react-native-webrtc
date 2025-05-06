@@ -1,6 +1,7 @@
 package com.oney.WebRTCModule;
 
 import android.annotation.SuppressLint;
+import android.content.res.Resources;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Point;
@@ -8,7 +9,10 @@ import androidx.core.view.ViewCompat;
 import android.view.View;
 import android.view.ViewGroup;
 import android.util.Log;
+import android.widget.Toast;
 
+import com.bugsnag.android.Bugsnag;
+import com.bugsnag.android.Severity;
 import com.facebook.react.bridge.ReactContext;
 
 import java.lang.reflect.InvocationTargetException;
@@ -16,6 +20,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 import org.webrtc.EglBase;
+import org.webrtc.EglError;
 import org.webrtc.MediaStream;
 import org.webrtc.RendererCommon;
 import org.webrtc.RendererCommon.RendererEvents;
@@ -168,7 +173,20 @@ public class WebRTCView extends ViewGroup {
     public WebRTCView(Context context) {
         super(context);
 
-        surfaceViewRenderer = new SurfaceViewRenderer(context);
+        surfaceViewRenderer = new SurfaceViewRenderer(context, new EglError() {
+          @Override
+          public void onSurfaceCreationFailed(Exception e) {
+            Toast.makeText(context, "Error in loading video. Please reopen the class", Toast.LENGTH_LONG).show();
+              try {
+                  Bugsnag.notify(e, event -> {
+                      event.setSeverity(Severity.INFO);
+                      return true;
+                  });
+              } catch (Exception exception) {
+                  exception.printStackTrace();
+              }
+          }
+        });
         addView(surfaceViewRenderer);
 
         setMirror(false);

@@ -9,6 +9,7 @@ import MediaStreamTrack from './MediaStreamTrack';
 import mediaDevices from './MediaDevices';
 import permissions from './Permissions';
 import GreenScreenView from './GreenScreenView'
+import { enableSoftwareAEC, disableSoftwareAEC } from './RTCUtil'
 
 export {
   RTCPeerConnection,
@@ -19,5 +20,7 @@ export {
   MediaStreamTrack,
   mediaDevices,
   permissions,
-  GreenScreenView
+  GreenScreenView,
+  enableSoftwareAEC,
+  disableSoftwareAEC,
 };

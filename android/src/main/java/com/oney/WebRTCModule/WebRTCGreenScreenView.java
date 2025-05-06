@@ -4,23 +4,28 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Point;
-import androidx.core.view.ViewCompat;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
-import android.util.Log;
+import android.widget.Toast;
 
+import androidx.core.view.ViewCompat;
+
+import com.bugsnag.android.Bugsnag;
+import com.bugsnag.android.Severity;
 import com.facebook.react.bridge.ReactContext;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.List;
-
 import org.webrtc.EglBase;
+import org.webrtc.EglError;
 import org.webrtc.MediaStream;
 import org.webrtc.RendererCommon;
 import org.webrtc.RendererCommon.RendererEvents;
 import org.webrtc.RendererCommon.ScalingType;
 import org.webrtc.VideoTrack;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.List;
 
 public class WebRTCGreenScreenView extends ViewGroup {
     /**
@@ -168,7 +173,20 @@ public class WebRTCGreenScreenView extends ViewGroup {
 
     public WebRTCGreenScreenView(Context context) {
         super(context);
-        surfaceViewRenderer = new UnSurfaceViewRenderer(getContext());
+        surfaceViewRenderer = new UnSurfaceViewRenderer(getContext(), new EglError() {
+          @Override
+          public void onSurfaceCreationFailed(Exception e) {
+            Toast.makeText(context, "Error in loading video. Please reopen the class", Toast.LENGTH_LONG).show();
+              try {
+                  Bugsnag.notify(e, event -> {
+                      event.setSeverity(Severity.INFO);
+                      return true;
+                  });
+              } catch (Exception exception) {
+                  exception.printStackTrace();
+              }
+          }
+        });
         addView(surfaceViewRenderer);
         setMirror(true);
         setScalingType(DEFAULT_SCALING_TYPE);
