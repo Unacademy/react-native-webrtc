@@ -61,6 +61,15 @@ export interface RTCVideoViewProps extends ViewProps {
    */
   zOrder?: number;
 
+  /**
+   * When true, iOS uses the legacy OpenGL (EAGL) renderer with chroma-key style
+   * green removal when {@code RTCEAGLVideoView} is available in the WebRTC
+   * SDK. Android ignores this flag on {@code RTCView}; use {@link GreenScreenView}
+   * for Android green-screen rendering.
+   *
+   * @platform ios
+   */
+  useGreenScreen?: boolean;
 
   /**
    * Picture in picture options for this view. Disabled if not supplied.

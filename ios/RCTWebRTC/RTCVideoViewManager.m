@@ -15,6 +15,15 @@
 #import <WebRTC/RTCVideoFrame.h>
 #import <WebRTC/RTCVideoTrack.h>
 
+#if !TARGET_OS_OSX && TARGET_OS_IPHONE
+#import <GLKit/GLKit.h>
+#if __has_include(<WebRTC/RTCEAGLVideoView.h>)
+#import <WebRTC/RTCEAGLVideoView.h>
+#import "RTCUNShader.h"
+#define RTC_HAS_EAGL_VIDEO_VIEW 1
+#endif
+#endif
+
 #import "PIPController.h"
 #import "RTCVideoViewManager.h"
 #import "WebRTCModule.h"
@@ -40,6 +49,10 @@
  */
 @property(nonatomic) RTCVideoViewObjectFit objectFit;
 
+#if !TARGET_OS_OSX
+@property(nonatomic) BOOL useGreenScreen;
+#endif
+
 @property(nonatomic) BOOL enablePIP;
 
 @property(nonatomic, strong) API_AVAILABLE(ios(15.0)) PIPController *pipController;
@@ -50,7 +63,7 @@
 #if TARGET_OS_OSX
 @property(nonatomic, readonly) RTCMTLNSVideoView *videoView;
 #else
-@property(nonatomic, readonly) RTCMTLVideoView *videoView;
+@property(nonatomic, readonly) UIView *videoView;
 #endif
 
 // Add a reference to the view manager
@@ -74,6 +87,78 @@
 
 @synthesize videoView = _videoView;
 @synthesize pipController = _pipController;
+
+#if !TARGET_OS_OSX
+
+- (void)recreateRendererSubviewForGreenScreenFlag:(BOOL)useGreen {
+    UIView *oldView = _videoView;
+    RTCVideoTrack *track = self.videoTrack;
+
+    if (oldView && track && self.window && _module) {
+        dispatch_sync(_module.workerQueue, ^{
+            [track removeRenderer:oldView];
+        });
+    }
+    [oldView removeFromSuperview];
+    _videoView = nil;
+
+#if TARGET_OS_IPHONE && defined(RTC_HAS_EAGL_VIDEO_VIEW)
+    if (useGreen) {
+        RTCEAGLVideoView *eaglView = [[RTCEAGLVideoView alloc] initWithFrame:CGRectZero shader:[[RTCUNShader alloc] init]];
+        eaglView.delegate = self;
+        eaglView.opaque = NO;
+        _videoView = eaglView;
+        for (UIView *sub in eaglView.subviews) {
+            if ([sub isKindOfClass:[GLKView class]]) {
+                ((GLKView *)sub).backgroundColor = [UIColor clearColor];
+                break;
+            }
+        }
+    } else
+#endif
+    {
+        RTCMTLVideoView *subview = [[RTCMTLVideoView alloc] initWithFrame:CGRectZero];
+        subview.delegate = self;
+        _videoView = subview;
+    }
+
+    [self addSubview:self.videoView];
+    [self applyObjectFitToVideoView];
+    self.videoView.transform = _mirror ? CGAffineTransformMakeScale(-1.0, 1.0) : CGAffineTransformIdentity;
+
+    if (track && self.window && _module) {
+        dispatch_async(_module.workerQueue, ^{
+            [track addRenderer:self.videoView];
+        });
+    }
+}
+
+- (void)applyObjectFitToVideoView {
+    if ([self.videoView isKindOfClass:[RTCMTLVideoView class]]) {
+        RTCMTLVideoView *metal = (RTCMTLVideoView *)self.videoView;
+        if (_objectFit == RTCVideoViewObjectFitCover) {
+            metal.videoContentMode = UIViewContentModeScaleAspectFill;
+        } else {
+            metal.videoContentMode = UIViewContentModeScaleAspectFit;
+        }
+    }
+}
+
+- (void)setUseGreenScreen:(BOOL)useGreenScreen {
+#if TARGET_OS_IPHONE && defined(RTC_HAS_EAGL_VIDEO_VIEW)
+    if (_useGreenScreen == useGreenScreen) {
+        return;
+    }
+    _useGreenScreen = useGreenScreen;
+    [self recreateRendererSubviewForGreenScreenFlag:useGreenScreen];
+#else
+    if (useGreenScreen) {
+        RCTLogWarn(@"RTCView useGreenScreen is unavailable: RTCEAGLVideoView is not shipped in this WebRTC build.");
+    }
+#endif
+}
+
+#endif // !TARGET_OS_OSX
 
 /**
  * Tells this view that its window object changed.
@@ -112,13 +197,14 @@
         RTCMTLNSVideoView *subview = [[RTCMTLNSVideoView alloc] initWithFrame:CGRectZero];
         subview.wantsLayer = true;
         _videoView = subview;
-#else
-        RTCMTLVideoView *subview = [[RTCMTLVideoView alloc] initWithFrame:CGRectZero];
-        _videoView = subview;
-#endif
         _objectFit = RTCVideoViewObjectFitCover;
         [self addSubview:self.videoView];
         self.videoView.delegate = self;
+#else
+        _objectFit = RTCVideoViewObjectFitCover;
+        _useGreenScreen = NO;
+        [self recreateRendererSubviewForGreenScreenFlag:NO];
+#endif
     }
 
     return self;
@@ -223,11 +309,7 @@
         _objectFit = fit;
 
 #if !TARGET_OS_OSX
-        if (fit == RTCVideoViewObjectFitCover) {
-            self.videoView.videoContentMode = UIViewContentModeScaleAspectFill;
-        } else {
-            self.videoView.videoContentMode = UIViewContentModeScaleAspectFit;
-        }
+        [self applyObjectFitToVideoView];
 #endif
         if (@available(iOS 15.0, *)) {
             _pipController.objectFit = fit;
@@ -331,6 +413,10 @@ RCT_EXPORT_MODULE()
 #pragma mark - View properties
 
 RCT_EXPORT_VIEW_PROPERTY(mirror, BOOL)
+
+#if !TARGET_OS_OSX
+RCT_EXPORT_VIEW_PROPERTY(useGreenScreen, BOOL)
+#endif
 
 /**
  * In the fashion of
