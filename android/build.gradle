@@ -31,6 +31,7 @@ android {
 
 dependencies {
     implementation "com.facebook.react:react-android:+"
-    api 'org.jitsi:webrtc:124.+'
+    // org.jitsi:webrtc:124.0.0: 64-bit .so has LOAD p_align 0x4000 (16 KB page size). Latest on Central.
+    api 'org.jitsi:webrtc:124.0.0'
     implementation "androidx.core:core:1.7.0"
 }
