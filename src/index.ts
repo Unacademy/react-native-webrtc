@@ -9,6 +9,7 @@ if (WebRTCModule === null) {
 }
 
 import { setupNativeEvents } from './EventEmitter';
+import GreenScreenView from './GreenScreenView';
 import Logger from './Logger';
 import mediaDevices from './MediaDevices';
 import MediaStream from './MediaStream';
@@ -27,7 +28,6 @@ import RTCRtpSendParameters, { type RTCRtpSendParametersInit } from './RTCRtpSen
 import RTCRtpSender from './RTCRtpSender';
 import RTCRtpTransceiver from './RTCRtpTransceiver';
 import RTCSessionDescription from './RTCSessionDescription';
-import GreenScreenView from './GreenScreenView';
 import RTCView, { type RTCVideoViewProps, type RTCIOSPIPOptions } from './RTCView';
 import ScreenCapturePickerView from './ScreenCapturePickerView';
 

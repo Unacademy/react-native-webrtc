@@ -4,6 +4,7 @@
       "target": "es6",
       "module": "commonjs",
       "strict": true,
+      "skipLibCheck": true,
       "moduleResolution": "node",
       "lib": ["es2015", "esnext"],
       "jsx": "react-native",
