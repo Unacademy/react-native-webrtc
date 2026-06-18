@@ -46,9 +46,13 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
     static final String TAG = WebRTCModule.class.getCanonicalName();
 
     PeerConnectionFactory mFactory;
+    // Second factory with software AEC/NS (hardware cancelers disabled). Used for live classes.
+    PeerConnectionFactory mFactory1;
     VideoEncoderFactory mVideoEncoderFactory;
     VideoDecoderFactory mVideoDecoderFactory;
     AudioDeviceModule mAudioDeviceModule;
+
+    private boolean enableSoftwareBasedNoiseCancellation = false;
 
     // Need to expose the peer connection codec factories here to get capabilities
     private final SparseArray<PeerConnectionObserver> mPeerConnectionObservers;
@@ -113,12 +117,42 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
         // PeerConnectionFactory now owns the adm native pointer, and we don't need it anymore.
         adm.release();
 
+        AudioDeviceModule softwareAdm = JavaAudioDeviceModule.builder(reactContext)
+                                                    .setEnableVolumeLogger(false)
+                                                    .setUseHardwareAcousticEchoCanceler(false)
+                                                    .setUseHardwareNoiseSuppressor(false)
+                                                    .createAudioDeviceModule();
+
+        mFactory1 = PeerConnectionFactory.builder()
+                            .setAudioDeviceModule(softwareAdm)
+                            .setVideoEncoderFactory(encoderFactory)
+                            .setVideoDecoderFactory(decoderFactory)
+                            .createPeerConnectionFactory();
+
+        softwareAdm.release();
+
         // Saving the encoder and decoder factories to get codec info later when needed.
         mVideoEncoderFactory = encoderFactory;
         mVideoDecoderFactory = decoderFactory;
         mAudioDeviceModule = adm;
 
         getUserMediaImpl = new GetUserMediaImpl(this, reactContext);
+    }
+
+    /**
+     * Unacademy live-class hook: pick software AEC factory for subsequent peer connections.
+     * Restored from bugsnag_bg — dropped during WebRTC 124 rebase (WebRtcAudioUtils removed upstream).
+     */
+    @ReactMethod
+    public void enableSoftwareAEC() {
+        enableSoftwareBasedNoiseCancellation = true;
+        Log.d(TAG, "enableSoftwareAEC: using software AEC/NS factory for new peer connections");
+    }
+
+    @ReactMethod
+    public void disableSoftwareAEC() {
+        enableSoftwareBasedNoiseCancellation = false;
+        Log.d(TAG, "disableSoftwareAEC: using default audio factory for new peer connections");
     }
 
     @NonNull
@@ -405,7 +439,10 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
             return (boolean) ThreadUtils
                     .submitToExecutor(() -> {
                         PeerConnectionObserver observer = new PeerConnectionObserver(this, id);
-                        PeerConnection peerConnection = mFactory.createPeerConnection(rtcConfiguration, observer);
+                        PeerConnectionFactory factory =
+                                enableSoftwareBasedNoiseCancellation ? mFactory1 : mFactory;
+                        PeerConnection peerConnection =
+                                factory.createPeerConnection(rtcConfiguration, observer);
                         if (peerConnection == null) {
                             return false;
                         }

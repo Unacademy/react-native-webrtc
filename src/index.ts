@@ -30,6 +30,7 @@ import RTCRtpTransceiver from './RTCRtpTransceiver';
 import RTCSessionDescription from './RTCSessionDescription';
 import RTCView, { type RTCVideoViewProps, type RTCIOSPIPOptions } from './RTCView';
 import ScreenCapturePickerView from './ScreenCapturePickerView';
+import { disableSoftwareAEC, enableSoftwareAEC } from './RTCUtil';
 
 Logger.enable(`${Logger.ROOT_PREFIX}:*`);
 
@@ -64,6 +65,8 @@ export {
     registerGlobals,
     startIOSPIP,
     stopIOSPIP,
+    enableSoftwareAEC,
+    disableSoftwareAEC,
 };
 
 declare const global: any;

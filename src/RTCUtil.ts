@@ -1,3 +1,6 @@
+import { NativeModules } from 'react-native';
+
+const { WebRTCModule } = NativeModules;
 
 const DEFAULT_AUDIO_CONSTRAINTS = {};
 
@@ -182,6 +185,18 @@ export function normalizeOfferOptions(options?: RTCOfferOptions) {
     }
 
     return newOptions;
+}
+
+/**
+ * Toggle software-based AEC/NS for live classes (Android only).
+ * Restored from Unacademy bugsnag_bg fork — omitted during WebRTC 124 rebase.
+ */
+export function enableSoftwareAEC() {
+    WebRTCModule?.enableSoftwareAEC?.();
+}
+
+export function disableSoftwareAEC() {
+    WebRTCModule?.disableSoftwareAEC?.();
 }
 
 /**
